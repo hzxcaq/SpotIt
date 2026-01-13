@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
+import QRCode from "qrcode";
 import { useContainer, useRoom, useItemsByContainer, itemsRepo } from "@/lib/db/hooks";
 import type { Item, ItemUnit } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, ChevronRight, ChevronLeft, Package, Box, Tag, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { Plus, ChevronRight, ChevronLeft, Package, Box, Tag, MoreHorizontal, Edit, Trash2, QrCode } from "lucide-react";
 
 interface ContainerDetailPageProps {
   params: Promise<{ containerId: string }>;
@@ -52,6 +53,17 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
   const [itemTags, setItemTags] = useState("");
   const [itemNotes, setItemNotes] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
+
+  useEffect(() => {
+    if (container?.code && qrDialogOpen) {
+      const qrContent = `spotit://container/${container.code}`;
+      QRCode.toDataURL(qrContent, { width: 256, margin: 2 })
+        .then(setQrDataUrl)
+        .catch(console.error);
+    }
+  }, [container?.code, qrDialogOpen]);
 
   const openCreateDialog = () => {
     setEditingItem(null);
@@ -130,24 +142,49 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-lg px-4 py-6">
-        <header className="mb-6 flex items-center gap-3">
-          <Link href={room ? `/rooms/${room.id}` : "/rooms"}>
-            <Button variant="ghost" size="icon-sm">
-              <ChevronLeft className="size-5" />
-            </Button>
-          </Link>
+        <header className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-              <Box className="size-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">{container.name}</h1>
-              <p className="text-sm text-muted-foreground">
-                {room?.name || "未知房间"}
-                {container.description && ` · ${container.description}`}
-              </p>
+            <Link href={room ? `/rooms/${room.id}` : "/rooms"}>
+              <Button variant="ghost" size="icon-sm">
+                <ChevronLeft className="size-5" />
+              </Button>
+            </Link>
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+                <Box className="size-5" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">{container.name}</h1>
+                <p className="text-sm text-muted-foreground">
+                  {room?.name || "未知房间"}
+                  {container.description && ` · ${container.description}`}
+                </p>
+              </div>
             </div>
           </div>
+          <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon-sm">
+                <QrCode className="size-5" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-xs">
+              <DialogHeader>
+                <DialogTitle>容器二维码</DialogTitle>
+                <DialogDescription>
+                  扫描此二维码可快速定位到 {container.name}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col items-center py-4">
+                {qrDataUrl && (
+                  <img src={qrDataUrl} alt="QR Code" className="rounded-lg" />
+                )}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  编码: {container.code}
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
         </header>
 
         <div className="mb-4 flex items-center justify-between">

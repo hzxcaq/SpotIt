@@ -3,20 +3,74 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAllHistory, useItems, useContainers } from "@/lib/db/hooks";
+import type { HistoryAction } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Home, QrCode, Package, ArrowRight, Clock } from "lucide-react";
+import { Plus, Home, QrCode, Package, ArrowRight, Clock, Edit, Trash2 } from "lucide-react";
 
-const recentActivities = [
-  { id: "1", action: "添加", item: "螺丝刀套装", location: "工具箱", time: "5 分钟前" },
-  { id: "2", action: "移动", item: "充电器", location: "客厅抽屉", time: "1 小时前" },
-  { id: "3", action: "借出", item: "电钻", location: "张三", time: "2 小时前" },
-  { id: "4", action: "归还", item: "万用表", location: "工具柜", time: "昨天" },
-];
+const actionLabels: Record<HistoryAction, string> = {
+  create: "添加",
+  move: "移动",
+  lend: "借出",
+  return: "归还",
+  update: "更新",
+  delete: "删除",
+};
+
+function formatTime(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  if (hours < 24) return `${hours} 小时前`;
+  if (days < 7) return `${days} 天前`;
+
+  return new Date(timestamp).toLocaleDateString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
 
 export default function HomePage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const history = useAllHistory();
+  const items = useItems();
+  const containers = useContainers();
+
+  const recentHistory = history.slice(0, 4);
+
+  const getItemName = (itemId: string) => {
+    return items.find((i) => i.id === itemId)?.name || "已删除物品";
+  };
+
+  const getLocationName = (containerId?: string) => {
+    if (containerId) {
+      const container = containers.find((c) => c.id === containerId);
+      return container?.name || "";
+    }
+    return "";
+  };
+
+  const getDescription = (record: typeof history[0]) => {
+    switch (record.action) {
+      case "create":
+        return getLocationName(record.toContainerId);
+      case "move":
+        return getLocationName(record.toContainerId);
+      case "lend":
+        return record.lentTo || "";
+      case "return":
+        return record.lentTo ? `从 ${record.lentTo}` : "";
+      default:
+        return "";
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,33 +133,42 @@ export default function HomePage() {
               查看全部
             </Link>
           </div>
-          <div className="space-y-2">
-            {recentActivities.map((activity) => (
-              <div
-                key={activity.id}
-                className="flex items-center gap-3 rounded-lg border p-3"
-              >
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                  {activity.action === "添加" && <Plus className="size-4" />}
-                  {activity.action === "移动" && <ArrowRight className="size-4" />}
-                  {activity.action === "借出" && <Package className="size-4" />}
-                  {activity.action === "归还" && <Package className="size-4" />}
+          {recentHistory.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-8">
+              <Clock className="mb-2 size-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">暂无操作记录</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentHistory.map((record) => (
+                <div
+                  key={record.id}
+                  className="flex items-center gap-3 rounded-lg border p-3"
+                >
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                    {record.action === "create" && <Plus className="size-4" />}
+                    {record.action === "move" && <ArrowRight className="size-4" />}
+                    {record.action === "lend" && <Package className="size-4" />}
+                    {record.action === "return" && <Package className="size-4" />}
+                    {record.action === "update" && <Edit className="size-4" />}
+                    {record.action === "delete" && <Trash2 className="size-4" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {actionLabels[record.action]} {getItemName(record.itemId)}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {getDescription(record) || "-"}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="size-3" />
+                    {formatTime(record.createdAt)}
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {activity.action} {activity.item}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {activity.location}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="size-3" />
-                  {activity.time}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>

@@ -84,6 +84,13 @@ export function useImagesByItem(itemId: ID | undefined): Image[] {
 
 // ============ History Hooks ============
 
+export function useAllHistory(): ItemHistory[] {
+  return useLiveQuery(
+    () => db.history.orderBy("createdAt").reverse().limit(50).toArray(),
+    []
+  ) ?? [];
+}
+
 export function useItemHistory(itemId: ID | undefined): ItemHistory[] {
   return useLiveQuery(
     () => (itemId ? historyRepo.getByItemId(itemId) : []),

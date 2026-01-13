@@ -22,7 +22,17 @@
       "Bash(npm start)",
       "Bash(node:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: SpotIt PWA 物品定位助手初始版本\n\n- Next.js 16 + React 19 + TypeScript\n- IndexedDB 本地存储 \\(Dexie\\)\n- PWA 支持 \\(next-pwa + Service Worker\\)\n- 房间/容器/物品层级管理\n- 搜索功能\n- 响应式 UI \\(Tailwind CSS + shadcn/ui\\)\nEOF\n\\)\")",
+      "Bash(gh auth:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Skill(collaborating-with-codex)",
+      "Skill(collaborating-with-gemini)",
+      "Bash(python:*)",
+      "Bash(git checkout:*)",
+      "Bash(type:*)"
     ]
   }
 }
