@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { DBInitializer } from "@/components/db-initializer";
 import { LocationProvider } from "@/components/location-provider";
+import { AutoBackup } from "@/components/auto-backup";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -49,6 +50,7 @@ export default function RootLayout({
       >
         <LocationProvider>
           <DBInitializer />
+          <AutoBackup />
           {children}
         </LocationProvider>
       </body>
