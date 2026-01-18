@@ -22,7 +22,7 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  turbopack: {},
+  // Turbopack disabled due to Windows compatibility issues
 };
 
 export default withPWA(nextConfig);

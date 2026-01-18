@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   ChevronLeft,
   Tag,
@@ -225,6 +226,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemName, setItemName] = useState("");
   const [itemAlias, setItemAlias] = useState("");
   const [itemQuantity, setItemQuantity] = useState("1");
@@ -264,11 +266,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   };
 
   const handleDelete = async () => {
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
     if (!item) return;
-    if (confirm("确定要删除此物品吗？")) {
-      await itemsRepo.delete(item.id);
-      router.push(container ? `/containers/${container.id}` : "/rooms");
-    }
+    await itemsRepo.delete(item.id);
+    router.push(container ? `/containers/${container.id}` : "/rooms");
   };
 
   const handleMove = async (newRoomId: string, newContainerId: string) => {
@@ -533,6 +537,16 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             />
           </div>
         </section>
+
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          onConfirm={confirmDelete}
+          title="删除物品"
+          description="确定要删除此物品吗？此操作无法撤销。"
+          confirmText="删除"
+          cancelText="取消"
+        />
       </main>
     </div>
   );

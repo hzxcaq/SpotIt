@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Plus, ChevronRight, ChevronLeft, Package, Box, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { nanoid } from "nanoid";
 
@@ -108,6 +109,8 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
   const [containerName, setContainerName] = useState("");
   const [containerDescription, setContainerDescription] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [containerToDelete, setContainerToDelete] = useState<string | null>(null);
 
   const openCreateDialog = () => {
     setEditingContainer(null);
@@ -148,10 +151,16 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
   };
 
   const handleDelete = async (containerId: string) => {
-    if (confirm("确定要删除此容器吗？容器内的物品将变为未分类状态。")) {
-      await containersRepo.delete(containerId);
-    }
+    setContainerToDelete(containerId);
+    setDeleteConfirmOpen(true);
     setMenuOpenId(null);
+  };
+
+  const confirmDelete = async () => {
+    if (containerToDelete) {
+      await containersRepo.delete(containerToDelete);
+      setContainerToDelete(null);
+    }
   };
 
   if (!room) {
@@ -252,6 +261,16 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
             ))}
           </div>
         )}
+
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          onConfirm={confirmDelete}
+          title="删除容器"
+          description="确定要删除此容器吗？容器内的物品将变为未分类状态。"
+          confirmText="删除"
+          cancelText="取消"
+        />
       </main>
     </div>
   );

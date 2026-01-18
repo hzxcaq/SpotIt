@@ -32,7 +32,8 @@
       "Skill(collaborating-with-gemini)",
       "Bash(python:*)",
       "Bash(git checkout:*)",
-      "Bash(type:*)"
+      "Bash(type:*)",
+      "Bash(choco install:*)"
     ]
   }
 }

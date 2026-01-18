@@ -7,7 +7,7 @@ import { useAllHistory, useItems, useContainers } from "@/lib/db/hooks";
 import type { HistoryAction } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Home, QrCode, Package, ArrowRight, Clock, Edit, Trash2 } from "lucide-react";
+import { Plus, Home, QrCode, Package, ArrowRight, Clock, Edit, Trash2, Settings } from "lucide-react";
 
 const actionLabels: Record<HistoryAction, string> = {
   create: "添加",
@@ -84,9 +84,21 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-lg px-4 py-6">
-        <header className="mb-6 text-center">
-          <h1 className="text-2xl font-bold tracking-tight">SpotIt</h1>
-          <p className="text-sm text-muted-foreground">物品定位助手</p>
+        <header className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex-1" />
+            <div className="text-center flex-1">
+              <h1 className="text-2xl font-bold tracking-tight">SpotIt</h1>
+              <p className="text-sm text-muted-foreground">物品定位助手</p>
+            </div>
+            <div className="flex-1 flex justify-end">
+              <Link href="/settings">
+                <Button variant="ghost" size="icon-sm">
+                  <Settings className="size-5" />
+                </Button>
+              </Link>
+            </div>
+          </div>
         </header>
 
         <form onSubmit={handleSearch} className="mb-6">

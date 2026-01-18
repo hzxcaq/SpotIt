@@ -16,6 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Plus, ChevronRight, ChevronLeft, Package, Box, Tag, MoreHorizontal, Edit, Trash2, QrCode } from "lucide-react";
 
 interface ContainerDetailPageProps {
@@ -55,6 +56,8 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (container?.code && qrDialogOpen) {
@@ -125,10 +128,16 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
   };
 
   const handleDelete = async (itemId: string) => {
-    if (confirm("确定要删除此物品吗？")) {
-      await itemsRepo.delete(itemId);
-    }
+    setItemToDelete(itemId);
+    setDeleteConfirmOpen(true);
     setMenuOpenId(null);
+  };
+
+  const confirmDelete = async () => {
+    if (itemToDelete) {
+      await itemsRepo.delete(itemToDelete);
+      setItemToDelete(null);
+    }
   };
 
   if (!container) {
@@ -361,6 +370,16 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
             ))}
           </div>
         )}
+
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          onConfirm={confirmDelete}
+          title="删除物品"
+          description="确定要删除此物品吗？此操作无法撤销。"
+          confirmText="删除"
+          cancelText="取消"
+        />
       </main>
     </div>
   );

@@ -55,7 +55,25 @@ export const roomsRepo = {
       createdAt: now(),
       updatedAt: now(),
     };
-    await db.rooms.add(room);
+
+    await db.transaction("rw", [db.rooms, db.containers], async () => {
+      await db.rooms.add(room);
+
+      const cabinetTypes = ["上柜", "下柜"];
+      const positions = ["左格", "中格", "右格"];
+
+      for (const cabinet of cabinetTypes) {
+        for (const position of positions) {
+          await containersRepo.create({
+            name: `${cabinet}-${position}`,
+            roomId: room.id,
+            description: `${room.name}的${cabinet}${position}`,
+            code: `${room.id}-${cabinet}-${position}`,
+          });
+        }
+      }
+    });
+
     return room;
   },
 
@@ -294,4 +312,25 @@ export const historyRepo = {
     const results = await db.history.where("itemId").equals(itemId).sortBy("createdAt");
     return results.reverse();
   },
+};
+
+// ============ Database Initialization ============
+
+export const initializeDefaultTemplate = async (): Promise<void> => {
+  const existingRooms = await db.rooms.count();
+  if (existingRooms > 0) {
+    return;
+  }
+
+  const defaultRooms = [
+    { name: "客厅", description: "客厅区域" },
+    { name: "厨房", description: "厨房区域" },
+    { name: "主卧", description: "主卧区域" },
+    { name: "次卧", description: "次卧区域" },
+    { name: "卫生间", description: "卫生间区域" },
+  ];
+
+  for (const roomData of defaultRooms) {
+    await roomsRepo.create(roomData);
+  }
 };

@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Plus, ChevronRight, Home, ChevronLeft, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 
 export default function RoomsPage() {
@@ -24,6 +25,8 @@ export default function RoomsPage() {
   const [roomName, setRoomName] = useState("");
   const [roomDescription, setRoomDescription] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
 
   const openCreateDialog = () => {
     setEditingRoom(null);
@@ -62,10 +65,16 @@ export default function RoomsPage() {
   };
 
   const handleDelete = async (roomId: string) => {
-    if (confirm("确定要删除此房间吗？房间内的容器也会被删除，物品将变为未分类状态。")) {
-      await roomsRepo.delete(roomId);
-    }
+    setRoomToDelete(roomId);
+    setDeleteConfirmOpen(true);
     setMenuOpenId(null);
+  };
+
+  const confirmDelete = async () => {
+    if (roomToDelete) {
+      await roomsRepo.delete(roomToDelete);
+      setRoomToDelete(null);
+    }
   };
 
   return (
@@ -206,6 +215,16 @@ export default function RoomsPage() {
             ))}
           </div>
         )}
+
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          onConfirm={confirmDelete}
+          title="删除房间"
+          description="确定要删除此房间吗？房间内的容器也会被删除，物品将变为未分类状态。"
+          confirmText="删除"
+          cancelText="取消"
+        />
       </main>
     </div>
   );
