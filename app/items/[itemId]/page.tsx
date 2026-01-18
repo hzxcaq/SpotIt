@@ -1,9 +1,9 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useItem, useContainer, useRoom, useRooms, useContainersByRoom, itemsRepo } from "@/lib/db/hooks";
+import { useItem, useContainer, useRoom, useRooms, useContainersByRoom, itemsRepo, imagesRepo, useItemImage } from "@/lib/db/hooks";
 import type { Item, ItemUnit } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ImageViewer } from "@/components/ui/image-viewer";
+import { processImage } from "@/lib/utils/image";
 import {
   ChevronLeft,
   Tag,
@@ -30,6 +32,10 @@ import {
   User,
   Calendar,
   ChevronRight,
+  Image as ImageIcon,
+  Upload,
+  Camera,
+  Loader2,
 } from "lucide-react";
 
 interface ItemDetailPageProps {
@@ -223,10 +229,16 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const item = useItem(itemId);
   const container = useContainer(item?.containerId);
   const room = useRoom(container?.roomId ?? item?.roomId);
+  const itemImage = useItemImage(itemId);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [itemName, setItemName] = useState("");
   const [itemAlias, setItemAlias] = useState("");
   const [itemQuantity, setItemQuantity] = useState("1");
@@ -283,6 +295,55 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     });
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !item) return;
+
+    setImageUploading(true);
+    setUploadError(null);
+
+    try {
+      const result = await processImage(file);
+
+      if (itemImage) {
+        await imagesRepo.delete(itemImage.id);
+      }
+
+      const newImage = await imagesRepo.create({
+        itemId: item.id,
+        dataUrl: result.dataUrl,
+        mimeType: result.mimeType,
+        size: result.size,
+        width: result.width,
+        height: result.height,
+      });
+
+      await itemsRepo.update(item.id, {
+        imageId: newImage.id,
+      });
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "上传失败");
+    } finally {
+      setImageUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleImageDelete = async () => {
+    if (!itemImage || !item) return;
+
+    try {
+      await imagesRepo.delete(itemImage.id);
+      await itemsRepo.update(item.id, {
+        imageId: undefined,
+      });
+    } catch (error) {
+      setUploadError("删除失败");
+    }
+  };
+
   if (!item) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -327,6 +388,82 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             </div>
           </div>
         </header>
+
+        {/* Image Section */}
+        <section className="mb-6">
+          {itemImage ? (
+            <div className="relative rounded-lg border overflow-hidden">
+              <button
+                onClick={() => setImageViewerOpen(true)}
+                className="w-full aspect-square relative bg-muted hover:opacity-90 transition-opacity"
+              >
+                <img
+                  src={itemImage.dataUrl}
+                  alt={item.name}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+              <div className="absolute top-2 right-2 flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="bg-background/80 backdrop-blur-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  disabled={imageUploading}
+                >
+                  {imageUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="bg-background/80 backdrop-blur-sm text-destructive hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleImageDelete();
+                  }}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed p-8 flex flex-col items-center justify-center gap-3 bg-muted/30">
+              <ImageIcon className="size-12 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">暂无图片</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={imageUploading}
+              >
+                {imageUploading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    上传中...
+                  </>
+                ) : (
+                  <>
+                    <Camera className="size-4" />
+                    上传图片
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+          {uploadError && (
+            <p className="mt-2 text-sm text-destructive">{uploadError}</p>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
+        </section>
 
         <div className="mb-6 flex gap-2">
           <Button variant="outline" size="sm" className="flex-1" onClick={openEditDialog}>
@@ -546,6 +683,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           description="确定要删除此物品吗？此操作无法撤销。"
           confirmText="删除"
           cancelText="取消"
+        />
+
+        <ImageViewer
+          open={imageViewerOpen}
+          onOpenChange={setImageViewerOpen}
+          imageUrl={itemImage?.dataUrl || ""}
+          alt={item.name}
         />
       </main>
     </div>

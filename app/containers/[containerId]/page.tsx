@@ -3,7 +3,7 @@
 import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { useContainer, useRoom, useItemsByContainer, itemsRepo } from "@/lib/db/hooks";
+import { useContainer, useRoom, useItemsByContainer, itemsRepo, useItemImage } from "@/lib/db/hooks";
 import type { Item, ItemUnit } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Plus, ChevronRight, ChevronLeft, Package, Box, Tag, MoreHorizontal, Edit, Trash2, QrCode } from "lucide-react";
+import { Plus, ChevronRight, ChevronLeft, Package, Box, Tag, MoreHorizontal, Edit, Trash2, QrCode, Image as ImageIcon } from "lucide-react";
 
 interface ContainerDetailPageProps {
   params: Promise<{ containerId: string }>;
@@ -300,32 +300,46 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
           </div>
         ) : (
           <div className="space-y-2">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className="relative flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
-              >
-                <Link
-                  href={`/items/${item.id}`}
-                  className="flex flex-1 items-center gap-3"
+            {items.map((item) => {
+              const ItemImage = () => {
+                const image = useItemImage(item.id);
+                return image ? (
+                  <img
+                    src={image.dataUrl}
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Tag className="size-5" />
+                );
+              };
+
+              return (
+                <div
+                  key={item.id}
+                  className="relative flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
                 >
-                  <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-                    <Tag className="size-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{item.name}</p>
-                      <span className={`rounded px-1.5 py-0.5 text-xs ${statusColors[item.status]}`}>
-                        {statusLabels[item.status]}
-                      </span>
+                  <Link
+                    href={`/items/${item.id}`}
+                    className="flex flex-1 items-center gap-3"
+                  >
+                    <div className="flex size-12 items-center justify-center rounded-lg bg-muted overflow-hidden shrink-0">
+                      <ItemImage />
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {item.quantity} {item.unit}
-                      {item.lentTo && ` · 借给 ${item.lentTo}`}
-                    </p>
-                  </div>
-                </Link>
-                <div className="flex items-center gap-1">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{item.name}</p>
+                        <span className={`rounded px-1.5 py-0.5 text-xs ${statusColors[item.status]}`}>
+                          {statusLabels[item.status]}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {item.quantity} {item.unit}
+                        {item.lentTo && ` · 借给 ${item.lentTo}`}
+                      </p>
+                    </div>
+                  </Link>
+                  <div className="flex items-center gap-1">
                   <div className="relative">
                     <Button
                       variant="ghost"
@@ -367,7 +381,8 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
                   </Link>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

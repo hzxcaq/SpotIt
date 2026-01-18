@@ -82,6 +82,15 @@ export function useImagesByItem(itemId: ID | undefined): Image[] {
   ) ?? [];
 }
 
+export function useImage(imageId: ID | undefined): Image | undefined {
+  return useLiveQuery(() => (imageId ? imagesRepo.getById(imageId) : undefined), [imageId]);
+}
+
+export function useItemImage(itemId: ID | undefined): Image | undefined {
+  const images = useImagesByItem(itemId);
+  return images[0];
+}
+
 // ============ History Hooks ============
 
 export function useAllHistory(): ItemHistory[] {
