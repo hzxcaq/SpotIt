@@ -353,7 +353,7 @@ async function getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
 
 // 验证文件夹权限
 async function verifyPermission(dirHandle: FileSystemDirectoryHandle): Promise<boolean> {
-  const options = { mode: "readwrite" as FileSystemPermissionMode };
+  const options = { mode: "readwrite" as const };
 
   // 检查是否已有权限
   // @ts-ignore
