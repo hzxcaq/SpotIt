@@ -33,7 +33,17 @@
       "Bash(python:*)",
       "Bash(git checkout:*)",
       "Bash(type:*)",
-      "Bash(choco install:*)"
+      "Bash(choco install:*)",
+      "Bash(timeout /t 5 /nobreak)",
+      "Bash(timeout 10 tail:*)",
+      "Bash(find:*)",
+      "Bash(echo:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(git diff:*)",
+      "WebFetch(domain:vercel.com)",
+      "Bash(git reset:*)",
+      "Bash(timeout 5 tail:*)"
     ]
-  }
+  },
+  "outputStyle": "Explanatory"
 }
