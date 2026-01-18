@@ -38,9 +38,16 @@ export interface BaseEntity {
 
 // ============ Models ============
 
+export interface Location extends BaseEntity {
+  name: string;
+  description?: string;
+  isDefault?: boolean;
+}
+
 export interface Room extends BaseEntity {
   name: string;
   description?: string;
+  locationId?: ID;
 }
 
 export interface Container extends BaseEntity {
@@ -87,6 +94,9 @@ export interface ItemHistory extends BaseEntity {
 }
 
 // ============ Input Types (for creation) ============
+
+export type CreateLocationInput = Omit<Location, "id" | "createdAt" | "updatedAt">;
+export type UpdateLocationInput = Partial<CreateLocationInput>;
 
 export type CreateRoomInput = Omit<Room, "id" | "createdAt" | "updatedAt">;
 export type UpdateRoomInput = Partial<CreateRoomInput>;

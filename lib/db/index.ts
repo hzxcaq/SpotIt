@@ -1,15 +1,18 @@
 import Dexie, { type EntityTable } from "dexie";
 import { nanoid } from "nanoid";
 import type {
+  Location,
   Room,
   Container,
   Item,
   Image,
   ItemHistory,
+  CreateLocationInput,
   CreateRoomInput,
   CreateContainerInput,
   CreateItemInput,
   CreateImageInput,
+  UpdateLocationInput,
   UpdateRoomInput,
   UpdateContainerInput,
   UpdateItemInput,
@@ -19,6 +22,7 @@ import type {
 // ============ Database Definition ============
 
 class SpotItDB extends Dexie {
+  locations!: EntityTable<Location, "id">;
   rooms!: EntityTable<Room, "id">;
   containers!: EntityTable<Container, "id">;
   items!: EntityTable<Item, "id">;
@@ -35,6 +39,11 @@ class SpotItDB extends Dexie {
       images: "&id, itemId, createdAt",
       history: "&id, itemId, action, createdAt",
     });
+
+    this.version(2).stores({
+      locations: "&id, name, isDefault, createdAt",
+      rooms: "&id, locationId, name, createdAt",
+    });
   }
 }
 
@@ -44,6 +53,63 @@ export const db = new SpotItDB();
 
 const now = () => Date.now();
 const generateId = () => nanoid();
+
+// ============ Location Operations ============
+
+export const locationsRepo = {
+  async create(input: CreateLocationInput): Promise<Location> {
+    const location: Location = {
+      id: generateId(),
+      ...input,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+
+    await db.transaction("rw", [db.locations, db.rooms, db.containers], async () => {
+      await db.locations.add(location);
+
+      // 为新地点创建默认房间和容器
+      const defaultRooms = [
+        { name: "客厅", description: "客厅区域" },
+        { name: "厨房", description: "厨房区域" },
+        { name: "主卧", description: "主卧区域" },
+        { name: "次卧", description: "次卧区域" },
+        { name: "卫生间", description: "卫生间区域" },
+      ];
+
+      for (const roomData of defaultRooms) {
+        await roomsRepo.create({
+          ...roomData,
+          locationId: location.id,
+        });
+      }
+    });
+
+    return location;
+  },
+
+  async getById(id: ID): Promise<Location | undefined> {
+    return db.locations.get(id);
+  },
+
+  async getAll(): Promise<Location[]> {
+    return db.locations.orderBy("createdAt").toArray();
+  },
+
+  async update(id: ID, input: UpdateLocationInput): Promise<void> {
+    await db.locations.update(id, { ...input, updatedAt: now() });
+  },
+
+  async delete(id: ID): Promise<void> {
+    await db.transaction("rw", [db.locations, db.rooms, db.containers, db.items], async () => {
+      const rooms = await db.rooms.where("locationId").equals(id).toArray();
+      for (const room of rooms) {
+        await roomsRepo.delete(room.id);
+      }
+      await db.locations.delete(id);
+    });
+  },
+};
 
 // ============ Room Operations ============
 
@@ -79,6 +145,10 @@ export const roomsRepo = {
 
   async getById(id: ID): Promise<Room | undefined> {
     return db.rooms.get(id);
+  },
+
+  async getByLocationId(locationId: ID): Promise<Room[]> {
+    return db.rooms.where("locationId").equals(locationId).reverse().sortBy("createdAt");
   },
 
   async getAll(): Promise<Room[]> {
@@ -317,20 +387,52 @@ export const historyRepo = {
 // ============ Database Initialization ============
 
 export const initializeDefaultTemplate = async (): Promise<void> => {
+  const existingLocations = await db.locations.count();
+  let defaultLocationId = "";
+
+  if (existingLocations === 0) {
+    const home = await locationsRepo.create({
+      name: "我的家",
+      isDefault: true,
+      description: "默认区域"
+    });
+    defaultLocationId = home.id;
+  } else {
+    const defaultLoc = await db.locations.filter(l => l.isDefault === true).first();
+    if (defaultLoc) {
+      defaultLocationId = defaultLoc.id;
+    } else {
+      const firstLoc = await db.locations.orderBy("createdAt").first();
+      if (!firstLoc) {
+        const newHome = await locationsRepo.create({
+          name: "我的家",
+          isDefault: true,
+          description: "默认区域"
+        });
+        defaultLocationId = newHome.id;
+      } else {
+        defaultLocationId = firstLoc.id;
+      }
+    }
+  }
+
   const existingRooms = await db.rooms.count();
-  if (existingRooms > 0) {
+  if (existingRooms > 0 && defaultLocationId) {
+    await db.rooms.filter(r => !r.locationId).modify({ locationId: defaultLocationId });
     return;
   }
 
-  const defaultRooms = [
-    { name: "客厅", description: "客厅区域" },
-    { name: "厨房", description: "厨房区域" },
-    { name: "主卧", description: "主卧区域" },
-    { name: "次卧", description: "次卧区域" },
-    { name: "卫生间", description: "卫生间区域" },
-  ];
+  if (existingRooms === 0 && defaultLocationId) {
+    const defaultRooms = [
+      { name: "客厅", description: "客厅区域", locationId: defaultLocationId },
+      { name: "厨房", description: "厨房区域", locationId: defaultLocationId },
+      { name: "主卧", description: "主卧区域", locationId: defaultLocationId },
+      { name: "次卧", description: "次卧区域", locationId: defaultLocationId },
+      { name: "卫生间", description: "卫生间区域", locationId: defaultLocationId },
+    ];
 
-  for (const roomData of defaultRooms) {
-    await roomsRepo.create(roomData);
+    for (const roomData of defaultRooms) {
+      await roomsRepo.create(roomData);
+    }
   }
 };

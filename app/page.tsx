@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAllHistory, useItems, useContainers } from "@/lib/db/hooks";
+import { useAllHistory, useItems, useContainers, useLocations } from "@/lib/db/hooks";
 import type { HistoryAction } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Home, QrCode, Package, ArrowRight, Clock, Edit, Trash2, Settings } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Plus, Home, Camera, Package, ArrowRight, Clock, Edit, Trash2, Settings, MapPin, ChevronDown } from "lucide-react";
+import { useLocationContext } from "@/components/location-provider";
 
 const actionLabels: Record<HistoryAction, string> = {
   create: "添加",
@@ -39,10 +41,14 @@ function formatTime(timestamp: number): string {
 export default function HomePage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const history = useAllHistory();
   const items = useItems();
   const containers = useContainers();
+  const { currentLocationId, setCurrentLocationId } = useLocationContext();
+  const locations = useLocations();
 
+  const currentLocation = locations.find(l => l.id === currentLocationId);
   const recentHistory = history.slice(0, 4);
 
   const getItemName = (itemId: string) => {
@@ -85,7 +91,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-lg px-4 py-6">
         <header className="mb-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex-1" />
             <div className="text-center flex-1">
               <h1 className="text-2xl font-bold tracking-tight">SpotIt</h1>
@@ -98,6 +104,24 @@ export default function HomePage() {
                 </Button>
               </Link>
             </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setLocationPickerOpen(true)}
+            >
+              <MapPin className="size-4" />
+              <span>{currentLocation?.name || "选择地点"}</span>
+              <ChevronDown className="size-3" />
+            </Button>
+            <Link href="/locations">
+              <Button variant="ghost" size="sm">
+                管理
+              </Button>
+            </Link>
           </div>
         </header>
 
@@ -131,8 +155,8 @@ export default function HomePage() {
             </Link>
             <Link href="/scan" className="block">
               <Button variant="outline" className="h-20 w-full flex-col gap-2">
-                <QrCode className="size-5" />
-                <span className="text-xs">扫码</span>
+                <Camera className="size-5" />
+                <span className="text-xs">拍照添加</span>
               </Button>
             </Link>
           </div>
@@ -182,6 +206,37 @@ export default function HomePage() {
             </div>
           )}
         </section>
+
+        <Dialog open={locationPickerOpen} onOpenChange={setLocationPickerOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>切换地点</DialogTitle>
+              <DialogDescription>选择要查看的地点</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2 py-4">
+              {locations.map(loc => (
+                <Button
+                  key={loc.id}
+                  variant={loc.id === currentLocationId ? "secondary" : "ghost"}
+                  className="justify-start"
+                  onClick={() => {
+                    setCurrentLocationId(loc.id);
+                    setLocationPickerOpen(false);
+                  }}
+                >
+                  <MapPin className="mr-2 size-4" /> {loc.name}
+                  {loc.description && <span className="ml-2 text-xs text-muted-foreground">({loc.description})</span>}
+                </Button>
+              ))}
+              <Link href="/locations" className="mt-2 block">
+                <Button variant="outline" className="w-full">
+                  <Settings className="mr-2 size-4" />
+                  管理地点
+                </Button>
+              </Link>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

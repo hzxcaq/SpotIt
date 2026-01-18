@@ -1,48 +1,37 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Html5Qrcode } from "html5-qrcode";
-import { containersRepo } from "@/lib/db/hooks";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Camera, AlertCircle, CheckCircle2 } from "lucide-react";
 
-type ScanStatus = "idle" | "scanning" | "success" | "error";
-
-export default function ScanPage() {
+export default function CameraPage() {
   const router = useRouter();
-  const [status, setStatus] = useState<ScanStatus>("idle");
+  const [status, setStatus] = useState<"idle" | "capturing" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [scannedContent, setScannedContent] = useState<string>("");
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const isProcessingRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const startScanner = async () => {
-    setStatus("scanning");
+  const startCamera = async () => {
+    setStatus("capturing");
     setErrorMessage("");
 
     try {
-      const scanner = new Html5Qrcode("qr-reader");
-      scannerRef.current = scanner;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
 
-      await scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        async (decodedText) => {
-          if (isProcessingRef.current) return;
-          isProcessingRef.current = true;
-
-          setScannedContent(decodedText);
-          await handleScanResult(decodedText);
-        },
-        () => {}
-      );
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
     } catch (err) {
       setStatus("error");
       if (err instanceof Error) {
         if (err.message.includes("Permission")) {
-          setErrorMessage("请允许访问摄像头以使用扫码功能");
+          setErrorMessage("请允许访问摄像头以使用拍照功能");
         } else {
           setErrorMessage(err.message);
         }
@@ -52,87 +41,102 @@ export default function ScanPage() {
     }
   };
 
-  const stopScanner = async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current = null;
-      } catch {}
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
   };
 
-  const handleScanResult = async (content: string) => {
-    await stopScanner();
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
 
-    const containerMatch = content.match(/^spotit:\/\/container\/(.+)$/);
-    if (containerMatch) {
-      const code = containerMatch[1];
-      const container = await containersRepo.getByCode(code);
-      if (container) {
-        setStatus("success");
-        setTimeout(() => {
-          router.push(`/containers/${container.id}`);
-        }, 500);
-        return;
-      }
+    const canvas = document.createElement("canvas");
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext("2d");
+
+    if (ctx) {
+      ctx.drawImage(videoRef.current, 0, 0);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          stopCamera();
+          setStatus("success");
+
+          // 将照片存储到 sessionStorage
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            sessionStorage.setItem("capturedPhoto", reader.result as string);
+            setTimeout(() => {
+              router.push("/items/new");
+            }, 500);
+          };
+          reader.readAsDataURL(blob);
+        }
+      }, "image/jpeg", 0.9);
     }
-
-    setStatus("error");
-    setErrorMessage(`无法识别的二维码内容: ${content}`);
-    isProcessingRef.current = false;
   };
 
   const handleRetry = () => {
-    isProcessingRef.current = false;
-    setScannedContent("");
-    startScanner();
+    setStatus("idle");
+    setErrorMessage("");
+    startCamera();
   };
-
-  useEffect(() => {
-    startScanner();
-    return () => {
-      stopScanner();
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-lg px-4 py-6">
         <header className="mb-6 flex items-center gap-3">
-          <Link href="/">
+          <Link href="/" onClick={stopCamera}>
             <Button variant="ghost" size="icon-sm">
               <ChevronLeft className="size-5" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-xl font-bold">扫码</h1>
-            <p className="text-sm text-muted-foreground">扫描容器二维码快速定位</p>
+            <h1 className="text-xl font-bold">拍照添加物品</h1>
+            <p className="text-sm text-muted-foreground">拍摄物品照片快速添加</p>
           </div>
         </header>
 
         <div className="space-y-4">
-          <div
-            id="qr-reader"
-            className="mx-auto aspect-square max-w-sm overflow-hidden rounded-lg bg-muted"
-          />
+          <div className="relative mx-auto aspect-square max-w-sm overflow-hidden rounded-lg bg-muted">
+            {status === "capturing" && (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="h-full w-full object-cover"
+              />
+            )}
+          </div>
 
           {status === "idle" && (
             <div className="flex flex-col items-center gap-3 py-4">
               <Camera className="size-10 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">正在初始化摄像头...</p>
+              <p className="text-sm text-muted-foreground">准备拍照</p>
+              <Button onClick={startCamera}>
+                <Camera className="size-4" />
+                启动摄像头
+              </Button>
             </div>
           )}
 
-          {status === "scanning" && (
-            <p className="text-center text-sm text-muted-foreground">
-              将二维码对准框内进行扫描
-            </p>
+          {status === "capturing" && (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <p className="text-center text-sm text-muted-foreground">
+                将物品对准画面中央
+              </p>
+              <Button onClick={capturePhoto} size="lg">
+                <Camera className="size-5" />
+                拍照
+              </Button>
+            </div>
           )}
 
           {status === "success" && (
             <div className="flex flex-col items-center gap-3 py-4">
               <CheckCircle2 className="size-10 text-green-500" />
-              <p className="text-sm text-green-600">扫描成功，正在跳转...</p>
+              <p className="text-sm text-green-600">拍照成功，正在跳转...</p>
             </div>
           )}
 
@@ -140,13 +144,8 @@ export default function ScanPage() {
             <div className="flex flex-col items-center gap-3 py-4">
               <AlertCircle className="size-10 text-destructive" />
               <p className="text-center text-sm text-destructive">{errorMessage}</p>
-              {scannedContent && (
-                <p className="text-center text-xs text-muted-foreground break-all">
-                  扫描内容: {scannedContent}
-                </p>
-              )}
               <Button onClick={handleRetry} variant="outline" size="sm">
-                重新扫描
+                重试
               </Button>
             </div>
           )}

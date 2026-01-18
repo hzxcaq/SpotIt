@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRooms, useContainersByRoom, itemsRepo, imagesRepo } from "@/lib/db/hooks";
@@ -37,6 +37,22 @@ export default function NewItemPage() {
 
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId);
   const selectedContainer = containers.find((c) => c.id === selectedContainerId);
+
+  useEffect(() => {
+    const capturedPhoto = sessionStorage.getItem("capturedPhoto");
+    if (capturedPhoto) {
+      setImagePreview(capturedPhoto);
+      sessionStorage.removeItem("capturedPhoto");
+
+      fetch(capturedPhoto)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], "captured-photo.jpg", { type: "image/jpeg" });
+          setImageFile(file);
+        })
+        .catch(console.error);
+    }
+  }, []);
 
   const handleRoomSelect = (roomId: string) => {
     setSelectedRoomId(roomId);

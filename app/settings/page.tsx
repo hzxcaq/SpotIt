@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import Link from "next/link";
-import { db } from "@/lib/db";
+import { db, initializeDefaultTemplate } from "@/lib/db";
 import { useStats } from "@/lib/db/hooks";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ interface ExportData {
   version: number;
   exportedAt: string;
   data: {
+    locations: unknown[];
     rooms: unknown[];
     containers: unknown[];
     items: unknown[];
@@ -43,7 +44,8 @@ export default function SettingsPage() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const [rooms, containers, items, images, history] = await Promise.all([
+      const [locations, rooms, containers, items, images, history] = await Promise.all([
+        db.locations.toArray(),
         db.rooms.toArray(),
         db.containers.toArray(),
         db.items.toArray(),
@@ -52,9 +54,9 @@ export default function SettingsPage() {
       ]);
 
       const exportData: ExportData = {
-        version: 1,
+        version: 2,
         exportedAt: new Date().toISOString(),
-        data: { rooms, containers, items, images, history },
+        data: { locations, rooms, containers, items, images, history },
       };
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
@@ -71,7 +73,7 @@ export default function SettingsPage() {
       setResultDialog({
         open: true,
         success: true,
-        message: `成功导出 ${rooms.length} 个房间、${containers.length} 个容器、${items.length} 件物品`,
+        message: `成功导出 ${locations.length} 个地点、${rooms.length} 个房间、${containers.length} 个容器、${items.length} 件物品`,
       });
     } catch (error) {
       setResultDialog({
@@ -122,26 +124,30 @@ export default function SettingsPage() {
     setImporting(true);
 
     try {
-      await db.transaction("rw", [db.rooms, db.containers, db.items, db.images, db.history], async () => {
+      await db.transaction("rw", [db.locations, db.rooms, db.containers, db.items, db.images, db.history], async () => {
         await db.history.clear();
         await db.images.clear();
         await db.items.clear();
         await db.containers.clear();
         await db.rooms.clear();
+        await db.locations.clear();
 
-        const { rooms, containers, items, images, history } = pendingImportData.data;
+        const { locations, rooms, containers, items, images, history } = pendingImportData.data;
+        if (locations && locations.length) await db.locations.bulkAdd(locations as never[]);
         if (rooms.length) await db.rooms.bulkAdd(rooms as never[]);
         if (containers.length) await db.containers.bulkAdd(containers as never[]);
         if (items.length) await db.items.bulkAdd(items as never[]);
-        if (images.length) await db.images.bulkAdd(images as never[]);
-        if (history.length) await db.history.bulkAdd(history as never[]);
+        if (images && images.length) await db.images.bulkAdd(images as never[]);
+        if (history && history.length) await db.history.bulkAdd(history as never[]);
       });
 
-      const { rooms, containers, items } = pendingImportData.data;
+      await initializeDefaultTemplate();
+
+      const { locations, rooms, containers, items } = pendingImportData.data;
       setResultDialog({
         open: true,
         success: true,
-        message: `成功导入 ${rooms.length} 个房间、${containers.length} 个容器、${items.length} 件物品`,
+        message: `成功导入 ${locations?.length || 0} 个地点、${rooms.length} 个房间、${containers.length} 个容器、${items.length} 件物品`,
       });
     } catch (error) {
       setResultDialog({

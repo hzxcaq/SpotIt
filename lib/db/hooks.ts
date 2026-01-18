@@ -3,13 +3,24 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   db,
+  locationsRepo,
   roomsRepo,
   containersRepo,
   itemsRepo,
   imagesRepo,
   historyRepo,
 } from "./index";
-import type { ID, Room, Container, Item, Image, ItemHistory } from "./types";
+import type { ID, Location, Room, Container, Item, Image, ItemHistory } from "./types";
+
+// ============ Location Hooks ============
+
+export function useLocations(): Location[] {
+  return useLiveQuery(() => locationsRepo.getAll(), []) ?? [];
+}
+
+export function useLocation(id: ID | undefined): Location | undefined {
+  return useLiveQuery(() => (id ? locationsRepo.getById(id) : undefined), [id]);
+}
 
 // ============ Room Hooks ============
 
@@ -19,6 +30,13 @@ export function useRooms(): Room[] {
 
 export function useRoom(id: ID | undefined): Room | undefined {
   return useLiveQuery(() => (id ? roomsRepo.getById(id) : undefined), [id]);
+}
+
+export function useRoomsByLocation(locationId: ID | undefined): Room[] {
+  return useLiveQuery(
+    () => (locationId ? roomsRepo.getByLocationId(locationId) : []),
+    [locationId]
+  ) ?? [];
 }
 
 // ============ Container Hooks ============
@@ -122,4 +140,4 @@ export function useStats() {
 }
 
 // Re-export repos for direct usage
-export { roomsRepo, containersRepo, itemsRepo, imagesRepo, historyRepo };
+export { locationsRepo, roomsRepo, containersRepo, itemsRepo, imagesRepo, historyRepo };

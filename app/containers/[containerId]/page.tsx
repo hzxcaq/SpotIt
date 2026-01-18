@@ -1,8 +1,7 @@
 "use client";
 
-import { use, useState, useEffect, useRef } from "react";
+import { use, useState, useRef } from "react";
 import Link from "next/link";
-import QRCode from "qrcode";
 import { useContainer, useRoom, useItemsByContainer, itemsRepo, imagesRepo, useItemImage } from "@/lib/db/hooks";
 import type { Item, ItemUnit } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { processImage } from "@/lib/utils/image";
-import { Plus, ChevronRight, ChevronLeft, Package, Box, Tag, MoreHorizontal, Edit, Trash2, QrCode, Image as ImageIcon, Camera, Upload, Loader2, X } from "lucide-react";
+import { Plus, ChevronRight, ChevronLeft, Package, Box, Tag, MoreHorizontal, Edit, Trash2, Image as ImageIcon, Camera, Upload, Loader2, X } from "lucide-react";
 
 interface ContainerDetailPageProps {
   params: Promise<{ containerId: string }>;
@@ -55,8 +54,6 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
   const [itemTags, setItemTags] = useState("");
   const [itemNotes, setItemNotes] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [qrDialogOpen, setQrDialogOpen] = useState(false);
-  const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
@@ -65,15 +62,6 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
   const [imageUploading, setImageUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (container?.code && qrDialogOpen) {
-      const qrContent = `spotit://container/${container.code}`;
-      QRCode.toDataURL(qrContent, { width: 256, margin: 2 })
-        .then(setQrDataUrl)
-        .catch(console.error);
-    }
-  }, [container?.code, qrDialogOpen]);
 
   const openCreateDialog = () => {
     setEditingItem(null);
@@ -232,29 +220,6 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
               </div>
             </div>
           </div>
-          <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon-sm">
-                <QrCode className="size-5" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-xs">
-              <DialogHeader>
-                <DialogTitle>容器二维码</DialogTitle>
-                <DialogDescription>
-                  扫描此二维码可快速定位到 {container.name}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col items-center py-4">
-                {qrDataUrl && (
-                  <img src={qrDataUrl} alt="QR Code" className="rounded-lg" />
-                )}
-                <p className="mt-3 text-xs text-muted-foreground">
-                  编码: {container.code}
-                </p>
-              </div>
-            </DialogContent>
-          </Dialog>
         </header>
 
         <div className="mb-4 flex items-center justify-between">

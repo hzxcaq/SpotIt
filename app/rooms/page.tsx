@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRooms, roomsRepo } from "@/lib/db/hooks";
+import { useRoomsByLocation, useLocations, roomsRepo } from "@/lib/db/hooks";
 import type { Room } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,10 +16,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Plus, ChevronRight, Home, ChevronLeft, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { Plus, ChevronRight, Home, ChevronLeft, MoreHorizontal, Edit, Trash2, MapPin, ChevronDown, Settings } from "lucide-react";
+import { useLocationContext } from "@/components/location-provider";
 
 export default function RoomsPage() {
-  const rooms = useRooms();
+  const { currentLocationId, setCurrentLocationId } = useLocationContext();
+  const rooms = useRoomsByLocation(currentLocationId);
+  const locations = useLocations();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [roomName, setRoomName] = useState("");
@@ -27,6 +30,11 @@ export default function RoomsPage() {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const currentLocation = locations.find(l => l.id === currentLocationId);
 
   const openCreateDialog = () => {
     setEditingRoom(null);
@@ -45,23 +53,37 @@ export default function RoomsPage() {
 
   const handleSubmit = async () => {
     if (!roomName.trim()) return;
+    if (!currentLocationId && !editingRoom) return;
+    if (saving) return;
 
-    if (editingRoom) {
-      await roomsRepo.update(editingRoom.id, {
-        name: roomName.trim(),
-        description: roomDescription.trim() || undefined,
-      });
-    } else {
-      await roomsRepo.create({
-        name: roomName.trim(),
-        description: roomDescription.trim() || undefined,
-      });
+    setSaving(true);
+    setError(null);
+    try {
+      if (editingRoom) {
+        await roomsRepo.update(editingRoom.id, {
+          name: roomName.trim(),
+          description: roomDescription.trim() || undefined,
+        });
+      } else {
+        const locationId = currentLocationId;
+        if (!locationId) return;
+        await roomsRepo.create({
+          name: roomName.trim(),
+          description: roomDescription.trim() || undefined,
+          locationId,
+        });
+      }
+
+      setDialogOpen(false);
+      setEditingRoom(null);
+      setRoomName("");
+      setRoomDescription("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "操作失败");
+      return;
+    } finally {
+      setSaving(false);
     }
-
-    setDialogOpen(false);
-    setEditingRoom(null);
-    setRoomName("");
-    setRoomDescription("");
   };
 
   const handleDelete = async (roomId: string) => {
@@ -80,16 +102,33 @@ export default function RoomsPage() {
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-lg px-4 py-6">
-        <header className="mb-6 flex items-center gap-3">
-          <Link href="/">
+        <header className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon-sm">
+                <ChevronLeft className="size-5" />
+              </Button>
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold">{currentLocation?.name || "房间管理"}</h1>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-1"
+                  onClick={() => setLocationPickerOpen(true)}
+                >
+                  <ChevronDown className="size-4" />
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">当前地点下的所有房间</p>
+            </div>
+          </div>
+          <Link href="/locations">
             <Button variant="ghost" size="icon-sm">
-              <ChevronLeft className="size-5" />
+              <Settings className="size-5" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-xl font-bold">房间管理</h1>
-            <p className="text-sm text-muted-foreground">按房间浏览和管理物品</p>
-          </div>
         </header>
 
         <div className="mb-4 flex justify-end">
@@ -131,12 +170,17 @@ export default function RoomsPage() {
                   />
                 </div>
               </div>
+              {error && (
+                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
                   取消
                 </Button>
-                <Button onClick={handleSubmit} disabled={!roomName.trim()}>
-                  {editingRoom ? "保存" : "创建"}
+                <Button onClick={handleSubmit} disabled={!roomName.trim() || saving}>
+                  {saving ? "保存中..." : editingRoom ? "保存" : "创建"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -225,6 +269,36 @@ export default function RoomsPage() {
           confirmText="删除"
           cancelText="取消"
         />
+
+        <Dialog open={locationPickerOpen} onOpenChange={setLocationPickerOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>切换地点</DialogTitle>
+              <DialogDescription>选择要查看的地点</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2 py-4">
+              {locations.map(loc => (
+                <Button
+                  key={loc.id}
+                  variant={loc.id === currentLocationId ? "secondary" : "ghost"}
+                  className="justify-start"
+                  onClick={() => {
+                    setCurrentLocationId(loc.id);
+                    setLocationPickerOpen(false);
+                  }}
+                >
+                  <MapPin className="mr-2 size-4" /> {loc.name}
+                </Button>
+              ))}
+              <Link href="/locations" className="mt-2 block">
+                <Button variant="outline" className="w-full">
+                  <Settings className="mr-2 size-4" />
+                  管理地点
+                </Button>
+              </Link>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
