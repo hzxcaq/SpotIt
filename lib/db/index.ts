@@ -419,20 +419,5 @@ export const initializeDefaultTemplate = async (): Promise<void> => {
   const existingRooms = await db.rooms.count();
   if (existingRooms > 0 && defaultLocationId) {
     await db.rooms.filter(r => !r.locationId).modify({ locationId: defaultLocationId });
-    return;
-  }
-
-  if (existingRooms === 0 && defaultLocationId) {
-    const defaultRooms = [
-      { name: "客厅", description: "客厅区域", locationId: defaultLocationId },
-      { name: "厨房", description: "厨房区域", locationId: defaultLocationId },
-      { name: "主卧", description: "主卧区域", locationId: defaultLocationId },
-      { name: "次卧", description: "次卧区域", locationId: defaultLocationId },
-      { name: "卫生间", description: "卫生间区域", locationId: defaultLocationId },
-    ];
-
-    for (const roomData of defaultRooms) {
-      await roomsRepo.create(roomData);
-    }
   }
 };
