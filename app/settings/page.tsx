@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronLeft, Download, Upload, AlertTriangle, CheckCircle2, Home, Box, Package, Clock, Trash2, HardDrive, RefreshCw } from "lucide-react";
+import { ChevronLeft, Download, Upload, AlertTriangle, CheckCircle2, Home, Box, Package, Clock, Trash2, HardDrive, RefreshCw, FolderOpen } from "lucide-react";
 import {
   getBackupSettings,
   enableAutoBackup,
@@ -25,6 +25,12 @@ import {
   downloadBackup,
   formatSize,
   getBackupLocationInfo,
+  isFileSystemAccessSupported,
+  selectBackupDirectory,
+  getBackupDirectoryPath,
+  clearDirectoryHandle,
+  setAutoDownloadMode,
+  getAutoDownloadMode,
   type BackupData,
   type BackupRecord,
 } from "@/lib/utils/backup";
@@ -45,6 +51,9 @@ export default function SettingsPage() {
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
   const [backupHistory, setBackupHistory] = useState<BackupRecord[]>([]);
   const [creatingBackup, setCreatingBackup] = useState(false);
+  const [autoDownloadMode, setAutoDownloadModeState] = useState<"prompt" | "auto">("prompt");
+  const [backupDirPath, setBackupDirPath] = useState<string | null>(null);
+  const [fsApiSupported, setFsApiSupported] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 加载备份设置
@@ -52,6 +61,13 @@ export default function SettingsPage() {
     const settings = getBackupSettings();
     setAutoBackupEnabled(settings.autoBackupEnabled);
     setBackupHistory(settings.backupHistory);
+    setAutoDownloadModeState(getAutoDownloadMode());
+    setFsApiSupported(isFileSystemAccessSupported());
+
+    // 加载备份文件夹路径
+    if (isFileSystemAccessSupported()) {
+      getBackupDirectoryPath().then(setBackupDirPath);
+    }
   }, []);
 
   // 切换自动备份
@@ -95,6 +111,46 @@ export default function SettingsPage() {
       });
     } finally {
       setCreatingBackup(false);
+    }
+  };
+
+  // 选择备份文件夹
+  const handleSelectDirectory = async () => {
+    try {
+      const dirHandle = await selectBackupDirectory();
+      if (dirHandle) {
+        setBackupDirPath(dirHandle.name);
+        setAutoDownloadMode("auto");
+        setAutoDownloadModeState("auto");
+        setResultDialog({
+          open: true,
+          success: true,
+          message: `已选择备份文件夹：${dirHandle.name}`,
+        });
+      }
+    } catch (error) {
+      setResultDialog({
+        open: true,
+        success: false,
+        message: error instanceof Error ? error.message : "选择文件夹失败",
+      });
+    }
+  };
+
+  // 切换备份模式
+  const handleToggleBackupMode = async (mode: "prompt" | "auto") => {
+    if (mode === "auto" && !backupDirPath) {
+      // 需要先选择文件夹
+      await handleSelectDirectory();
+    } else if (mode === "prompt") {
+      // 切换到提示模式，清除文件夹
+      await clearDirectoryHandle();
+      setBackupDirPath(null);
+      setAutoDownloadMode(mode);
+      setAutoDownloadModeState(mode);
+    } else {
+      setAutoDownloadMode(mode);
+      setAutoDownloadModeState(mode);
     }
   };
 
@@ -339,12 +395,89 @@ export default function SettingsPage() {
                 {autoBackupEnabled ? "已开启" : "开启"}
               </Button>
             </div>
-            <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
+
+            {autoBackupEnabled && (
+              <div className="space-y-3 mt-4 pt-4 border-t">
+                <div>
+                  <p className="text-sm font-medium mb-2">备份方式</p>
+                  <div className="space-y-2">
+                    <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="backup-mode"
+                        value="prompt"
+                        checked={autoDownloadMode === "prompt"}
+                        onChange={() => handleToggleBackupMode("prompt")}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">提示下载</p>
+                        <p className="text-xs text-muted-foreground">
+                          备份后提示下载，兼容所有浏览器
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="backup-mode"
+                        value="auto"
+                        checked={autoDownloadMode === "auto"}
+                        onChange={() => handleToggleBackupMode("auto")}
+                        disabled={!fsApiSupported}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">
+                          自动保存到文件夹
+                          {fsApiSupported && " (推荐)"}
+                          {!fsApiSupported && " (不支持)"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {fsApiSupported
+                            ? "自动保存到指定文件夹，无需手动下载"
+                            : "您的浏览器不支持此功能，请使用 Chrome 86+ 或 Edge 86+"}
+                        </p>
+                        {autoDownloadMode === "auto" && backupDirPath && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <FolderOpen className="size-4 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              {backupDirPath}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleSelectDirectory();
+                              }}
+                            >
+                              更改
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground mt-3">
               <p className="font-medium mb-1">💡 备份说明：</p>
-              <p>• 备份保存位置：{getBackupLocationInfo()}</p>
-              <p>• 自动保留最近 7 天的备份</p>
-              <p>• 清除浏览器数据会同时清除备份</p>
-              <p>• 建议定期下载备份文件到电脑或云盘</p>
+              <p>• 浏览器备份：保存在 {getBackupLocationInfo()}</p>
+              {autoDownloadMode === "auto" && backupDirPath ? (
+                <>
+                  <p>• 文件备份：自动保存到 {backupDirPath} 文件夹</p>
+                  <p>• 文件名：spotit-backup-latest.json（自动覆盖）</p>
+                </>
+              ) : (
+                <p>• 文件备份：需要手动下载到电脑或云盘</p>
+              )}
+              <p>• 浏览器备份自动保留最近 7 天</p>
+              <p>• 清除浏览器数据会同时清除浏览器备份</p>
             </div>
           </div>
         </section>

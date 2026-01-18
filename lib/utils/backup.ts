@@ -17,6 +17,8 @@ export interface BackupSettings {
   autoBackupEnabled: boolean;
   lastBackupTime: number | null;
   backupHistory: BackupRecord[];
+  autoDownloadMode: "prompt" | "auto"; // 新增：下载模式
+  fileSystemHandle: string | null; // 新增：文件夹句柄（序列化后的）
 }
 
 export interface BackupRecord {
@@ -29,6 +31,12 @@ export interface BackupRecord {
 const BACKUP_SETTINGS_KEY = "spotit_backup_settings";
 const BACKUP_PREFIX = "spotit_backup_";
 const MAX_BACKUP_COUNT = 7; // 保留最近7天的备份
+const FILE_HANDLE_KEY = "spotit_file_handle";
+
+// 检查是否支持 File System Access API
+export function isFileSystemAccessSupported(): boolean {
+  return typeof window !== "undefined" && "showDirectoryPicker" in window;
+}
 
 // 获取备份设置
 export function getBackupSettings(): BackupSettings {
@@ -37,6 +45,8 @@ export function getBackupSettings(): BackupSettings {
       autoBackupEnabled: false,
       lastBackupTime: null,
       backupHistory: [],
+      autoDownloadMode: "prompt",
+      fileSystemHandle: null,
     };
   }
 
@@ -46,6 +56,8 @@ export function getBackupSettings(): BackupSettings {
       autoBackupEnabled: false,
       lastBackupTime: null,
       backupHistory: [],
+      autoDownloadMode: "prompt",
+      fileSystemHandle: null,
     };
   }
 
@@ -56,6 +68,8 @@ export function getBackupSettings(): BackupSettings {
       autoBackupEnabled: false,
       lastBackupTime: null,
       backupHistory: [],
+      autoDownloadMode: "prompt",
+      fileSystemHandle: null,
     };
   }
 }
@@ -224,4 +238,268 @@ export function downloadBackup(backupData: BackupData, filename?: string): void 
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ============ File System Access API 相关功能 ============
+
+// 选择备份文件夹
+export async function selectBackupDirectory(): Promise<FileSystemDirectoryHandle | null> {
+  if (!isFileSystemAccessSupported()) {
+    return null;
+  }
+
+  try {
+    // @ts-ignore - File System Access API
+    const dirHandle = await window.showDirectoryPicker({
+      mode: "readwrite",
+      startIn: "downloads",
+    });
+
+    // 保存文件夹句柄到 IndexedDB（因为 localStorage 不能存储对象）
+    await saveDirectoryHandle(dirHandle);
+
+    return dirHandle;
+  } catch (error) {
+    if ((error as Error).name === "AbortError") {
+      // 用户取消选择
+      return null;
+    }
+    throw error;
+  }
+}
+
+// 保存文件夹句柄到 IndexedDB
+async function saveDirectoryHandle(dirHandle: FileSystemDirectoryHandle): Promise<void> {
+  if (!("indexedDB" in window)) return;
+
+  const dbName = "spotit_file_handles";
+  const storeName = "handles";
+
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 1);
+
+    request.onerror = () => reject(request.error);
+
+    request.onsuccess = () => {
+      const db = request.result;
+      const transaction = db.transaction(storeName, "readwrite");
+      const store = transaction.objectStore(storeName);
+
+      store.put({ id: FILE_HANDLE_KEY, handle: dirHandle });
+
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+
+      transaction.onerror = () => reject(transaction.error);
+    };
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(storeName)) {
+        db.createObjectStore(storeName, { keyPath: "id" });
+      }
+    };
+  });
+}
+
+// 获取保存的文件夹句柄
+async function getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
+  if (!("indexedDB" in window)) return null;
+
+  const dbName = "spotit_file_handles";
+  const storeName = "handles";
+
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 1);
+
+    request.onerror = () => {
+      resolve(null);
+    };
+
+    request.onsuccess = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(storeName)) {
+        db.close();
+        resolve(null);
+        return;
+      }
+
+      const transaction = db.transaction(storeName, "readonly");
+      const store = transaction.objectStore(storeName);
+      const getRequest = store.get(FILE_HANDLE_KEY);
+
+      getRequest.onsuccess = () => {
+        db.close();
+        resolve(getRequest.result?.handle || null);
+      };
+
+      getRequest.onerror = () => {
+        db.close();
+        resolve(null);
+      };
+    };
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(storeName)) {
+        db.createObjectStore(storeName, { keyPath: "id" });
+      }
+    };
+  });
+}
+
+// 验证文件夹权限
+async function verifyPermission(dirHandle: FileSystemDirectoryHandle): Promise<boolean> {
+  const options = { mode: "readwrite" as FileSystemPermissionMode };
+
+  // 检查是否已有权限
+  // @ts-ignore
+  if ((await dirHandle.queryPermission(options)) === "granted") {
+    return true;
+  }
+
+  // 请求权限
+  // @ts-ignore
+  if ((await dirHandle.requestPermission(options)) === "granted") {
+    return true;
+  }
+
+  return false;
+}
+
+// 保存备份到文件系统
+export async function saveBackupToFileSystem(backupData: BackupData): Promise<boolean> {
+  if (!isFileSystemAccessSupported()) {
+    return false;
+  }
+
+  try {
+    const dirHandle = await getDirectoryHandle();
+    if (!dirHandle) {
+      return false;
+    }
+
+    // 验证权限
+    const hasPermission = await verifyPermission(dirHandle);
+    if (!hasPermission) {
+      return false;
+    }
+
+    // 生成文件名（只保留最新的一个）
+    const filename = "spotit-backup-latest.json";
+
+    // 创建或覆盖文件
+    const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+
+    // 写入数据
+    await writable.write(JSON.stringify(backupData, null, 2));
+    await writable.close();
+
+    return true;
+  } catch (error) {
+    console.error("保存备份到文件系统失败:", error);
+    return false;
+  }
+}
+
+// 获取文件夹路径（用于显示）
+export async function getBackupDirectoryPath(): Promise<string | null> {
+  if (!isFileSystemAccessSupported()) {
+    return null;
+  }
+
+  try {
+    const dirHandle = await getDirectoryHandle();
+    if (!dirHandle) {
+      return null;
+    }
+
+    return dirHandle.name;
+  } catch {
+    return null;
+  }
+}
+
+// 清除文件夹句柄
+export async function clearDirectoryHandle(): Promise<void> {
+  if (!("indexedDB" in window)) return;
+
+  const dbName = "spotit_file_handles";
+  const storeName = "handles";
+
+  return new Promise((resolve) => {
+    const request = indexedDB.open(dbName, 1);
+
+    request.onsuccess = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(storeName)) {
+        db.close();
+        resolve();
+        return;
+      }
+
+      const transaction = db.transaction(storeName, "readwrite");
+      const store = transaction.objectStore(storeName);
+
+      store.delete(FILE_HANDLE_KEY);
+
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+
+      transaction.onerror = () => {
+        db.close();
+        resolve();
+      };
+    };
+
+    request.onerror = () => {
+      resolve();
+    };
+  });
+}
+
+// 设置自动下载模式
+export function setAutoDownloadMode(mode: "prompt" | "auto"): void {
+  const settings = getBackupSettings();
+  settings.autoDownloadMode = mode;
+  saveBackupSettings(settings);
+}
+
+// 获取自动下载模式
+export function getAutoDownloadMode(): "prompt" | "auto" {
+  const settings = getBackupSettings();
+  return settings.autoDownloadMode || "prompt";
+}
+
+// 创建备份并根据设置自动保存
+export async function createBackupWithAutoSave(): Promise<{
+  record: BackupRecord;
+  savedToFile: boolean;
+  needsPrompt: boolean;
+}> {
+  // 创建备份到 localStorage
+  const record = await createBackup();
+
+  const settings = getBackupSettings();
+  const backupData = getBackupData(record.id);
+
+  if (!backupData) {
+    return { record, savedToFile: false, needsPrompt: false };
+  }
+
+  // 如果是自动模式且支持文件系统 API
+  if (settings.autoDownloadMode === "auto" && isFileSystemAccessSupported()) {
+    const savedToFile = await saveBackupToFileSystem(backupData);
+    return { record, savedToFile, needsPrompt: false };
+  }
+
+  // 提示模式
+  return { record, savedToFile: false, needsPrompt: true };
 }
