@@ -54,6 +54,8 @@ export default function SettingsPage() {
   const [autoDownloadMode, setAutoDownloadModeState] = useState<"prompt" | "auto">("prompt");
   const [backupDirPath, setBackupDirPath] = useState<string | null>(null);
   const [fsApiSupported, setFsApiSupported] = useState(false);
+  const [deleteBackupDialogOpen, setDeleteBackupDialogOpen] = useState(false);
+  const [backupToDelete, setBackupToDelete] = useState<BackupRecord | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 加载备份设置
@@ -210,16 +212,23 @@ export default function SettingsPage() {
 
   // 删除备份
   const handleDeleteBackup = (record: BackupRecord) => {
-    if (confirm("确定要删除这个备份吗？")) {
-      deleteBackup(record.id);
-      const settings = getBackupSettings();
-      setBackupHistory(settings.backupHistory);
-      setResultDialog({
-        open: true,
-        success: true,
-        message: "备份已删除",
-      });
-    }
+    setBackupToDelete(record);
+    setDeleteBackupDialogOpen(true);
+  };
+
+  const confirmDeleteBackup = () => {
+    if (!backupToDelete) return;
+
+    deleteBackup(backupToDelete.id);
+    const settings = getBackupSettings();
+    setBackupHistory(settings.backupHistory);
+    setDeleteBackupDialogOpen(false);
+    setBackupToDelete(null);
+    setResultDialog({
+      open: true,
+      success: true,
+      message: "备份已删除",
+    });
   };
 
   // 导出当前数据
@@ -660,6 +669,36 @@ export default function SettingsPage() {
             </Button>
             <Button variant="destructive" onClick={handleImportConfirm}>
               确认导入
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除备份确认对话框 */}
+      <Dialog open={deleteBackupDialogOpen} onOpenChange={setDeleteBackupDialogOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-5 text-yellow-500" />
+              确认删除备份
+            </DialogTitle>
+            <DialogDescription>
+              确定要删除这个备份吗？此操作不可撤销。
+            </DialogDescription>
+          </DialogHeader>
+          {backupToDelete && (
+            <div className="rounded-lg bg-muted p-3 text-sm">
+              <p>备份时间: {new Date(backupToDelete.timestamp).toLocaleString("zh-CN")}</p>
+              <p>物品数量: {backupToDelete.itemCount} 件</p>
+              <p>备份大小: {formatSize(backupToDelete.size)}</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteBackupDialogOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteBackup}>
+              确认删除
             </Button>
           </DialogFooter>
         </DialogContent>
