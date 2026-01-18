@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronLeft, Download, Upload, AlertTriangle, CheckCircle2, Home, Box, Package, Clock, Trash2, HardDrive, RefreshCw, FolderOpen } from "lucide-react";
+import { ChevronLeft, Download, Upload, AlertTriangle, CheckCircle2, Home, Box, Package, Clock, Trash2, HardDrive, RefreshCw, FolderOpen, BookOpen } from "lucide-react";
 import {
   getBackupSettings,
   enableAutoBackup,
@@ -602,12 +602,27 @@ export default function SettingsPage() {
 
         <section>
           <h2 className="mb-3 text-sm font-medium text-muted-foreground">关于</h2>
-          <div className="rounded-lg border p-4">
-            <p className="font-medium">SpotIt</p>
-            <p className="text-sm text-muted-foreground">物品定位助手 v0.2.0</p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              数据存储在本地浏览器中。建议开启自动备份，并定期下载备份文件到安全位置。
-            </p>
+          <div className="space-y-3">
+            <Link href="/help">
+              <div className="rounded-lg border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <BookOpen className="size-5 text-primary" />
+                  <div className="flex-1">
+                    <p className="font-medium">使用指南</p>
+                    <p className="text-xs text-muted-foreground">查看完整的使用教程和常见问题</p>
+                  </div>
+                  <ChevronLeft className="size-5 rotate-180 text-muted-foreground" />
+                </div>
+              </div>
+            </Link>
+
+            <div className="rounded-lg border p-4">
+              <p className="font-medium">SpotIt</p>
+              <p className="text-sm text-muted-foreground">物品定位助手 v0.2.0</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                数据存储在本地浏览器中。建议开启自动备份，并定期下载备份文件到安全位置。
+              </p>
+            </div>
           </div>
         </section>
       </main>
