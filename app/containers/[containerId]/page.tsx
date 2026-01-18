@@ -1,9 +1,9 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { useContainer, useRoom, useItemsByContainer, itemsRepo, useItemImage } from "@/lib/db/hooks";
+import { useContainer, useRoom, useItemsByContainer, itemsRepo, imagesRepo, useItemImage } from "@/lib/db/hooks";
 import type { Item, ItemUnit } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Plus, ChevronRight, ChevronLeft, Package, Box, Tag, MoreHorizontal, Edit, Trash2, QrCode, Image as ImageIcon } from "lucide-react";
+import { processImage } from "@/lib/utils/image";
+import { Plus, ChevronRight, ChevronLeft, Package, Box, Tag, MoreHorizontal, Edit, Trash2, QrCode, Image as ImageIcon, Camera, Upload, Loader2, X } from "lucide-react";
 
 interface ContainerDetailPageProps {
   params: Promise<{ containerId: string }>;
@@ -59,6 +60,12 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (container?.code && qrDialogOpen) {
       const qrContent = `spotit://container/${container.code}`;
@@ -75,6 +82,9 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
     setItemUnit("个");
     setItemTags("");
     setItemNotes("");
+    setImageFile(null);
+    setImagePreview(null);
+    setUploadError(null);
     setDialogOpen(true);
   };
 
@@ -85,8 +95,40 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
     setItemUnit(item.unit);
     setItemTags(item.tags?.join(", ") || "");
     setItemNotes(item.notes || "");
+    setImageFile(null);
+    setImagePreview(null);
+    setUploadError(null);
     setDialogOpen(true);
     setMenuOpenId(null);
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageUploading(true);
+    setUploadError(null);
+
+    try {
+      const result = await processImage(file);
+      setImageFile(file);
+      setImagePreview(result.dataUrl);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "图片处理失败");
+      setImageFile(null);
+      setImagePreview(null);
+    } finally {
+      setImageUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setUploadError(null);
   };
 
   const handleSubmit = async () => {
@@ -106,7 +148,7 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
         notes: itemNotes.trim() || undefined,
       });
     } else {
-      await itemsRepo.create({
+      const item = await itemsRepo.create({
         name: itemName.trim(),
         quantity: parseInt(itemQuantity, 10) || 1,
         unit: itemUnit,
@@ -116,6 +158,22 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
         roomId: container.roomId,
         status: "in_stock",
       });
+
+      if (imagePreview) {
+        const result = await processImage(imageFile!);
+        const newImage = await imagesRepo.create({
+          itemId: item.id,
+          dataUrl: result.dataUrl,
+          mimeType: result.mimeType,
+          size: result.size,
+          width: result.width,
+          height: result.height,
+        });
+
+        await itemsRepo.update(item.id, {
+          imageId: newImage.id,
+        });
+      }
     }
 
     setDialogOpen(false);
@@ -125,6 +183,9 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
     setItemUnit("个");
     setItemTags("");
     setItemNotes("");
+    setImageFile(null);
+    setImagePreview(null);
+    setUploadError(null);
   };
 
   const handleDelete = async (itemId: string) => {
@@ -257,6 +318,69 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
                     </select>
                   </div>
                 </div>
+
+                {!editingItem && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      物品图片（可选）
+                    </label>
+                    {imagePreview ? (
+                      <div className="relative rounded-lg border overflow-hidden">
+                        <div className="w-full aspect-square relative bg-muted">
+                          <img
+                            src={imagePreview}
+                            alt="预览"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon-sm"
+                            className="bg-background/80 backdrop-blur-sm"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={imageUploading}
+                            type="button"
+                          >
+                            {imageUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon-sm"
+                            className="bg-background/80 backdrop-blur-sm text-destructive hover:text-destructive"
+                            onClick={handleRemoveImage}
+                            type="button"
+                          >
+                            <X className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={imageUploading}
+                        className="w-full rounded-lg border border-dashed p-6 flex flex-col items-center justify-center gap-2 bg-muted/30 hover:bg-muted/50 transition-colors"
+                      >
+                        <Camera className="size-10 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          {imageUploading ? "处理中..." : "点击上传图片"}
+                        </p>
+                      </button>
+                    )}
+                    {uploadError && (
+                      <p className="text-sm text-destructive">{uploadError}</p>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageSelect}
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label htmlFor="item-tags" className="text-sm font-medium">
                     标签（可选，逗号分隔）
