@@ -76,7 +76,7 @@ function InfoRow({
       <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-medium">{value || "-"}</p>
+        <div className="text-sm font-medium">{value || "-"}</div>
       </div>
     </div>
   );
