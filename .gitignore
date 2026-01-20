@@ -64,6 +64,7 @@ Thumbs.db
 
 # Claude temp files
 tmpclaude-*-cwd
+.claude/
 
 # Package lock (optional, uncomment if needed)
 # package-lock.json
