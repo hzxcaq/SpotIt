@@ -3,14 +3,15 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRoomsByLocation, useContainersByRoom, itemsRepo, imagesRepo } from "@/lib/db/hooks";
+import { useRoomsByLocation, useContainersByRoom, itemsRepo, imagesRepo, roomsRepo, containersRepo } from "@/lib/db/hooks";
 import type { ItemUnit } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { processImage } from "@/lib/utils/image";
 import { getSuggestedTags } from "@/lib/utils/tag-suggestions";
 import { useLocationContext } from "@/components/location-provider";
-import { ChevronLeft, ChevronRight, Home, Box, Tag, Camera, Upload, Loader2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Home, Box, Tag, Camera, Upload, Loader2, X, Plus } from "lucide-react";
 
 const unitOptions: ItemUnit[] = ["个", "件", "只", "盒", "箱", "包", "袋", "卷", "张", "本", "瓶", "罐", "桶", "套", "组", "对", "米", "厘米", "克", "千克"];
 
@@ -38,6 +39,14 @@ export default function NewItemPage() {
   const [imageUploading, setImageUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [newRoomDialogOpen, setNewRoomDialogOpen] = useState(false);
+  const [newRoomName, setNewRoomName] = useState("");
+  const [newRoomSaving, setNewRoomSaving] = useState(false);
+
+  const [newContainerDialogOpen, setNewContainerDialogOpen] = useState(false);
+  const [newContainerName, setNewContainerName] = useState("");
+  const [newContainerSaving, setNewContainerSaving] = useState(false);
 
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId);
   const selectedContainer = containers.find((c) => c.id === selectedContainerId);
@@ -175,6 +184,38 @@ export default function NewItemPage() {
     }
   };
 
+  const handleCreateRoom = async () => {
+    if (!newRoomName.trim() || !currentLocationId) return;
+    setNewRoomSaving(true);
+    try {
+      const room = await roomsRepo.create({
+        name: newRoomName.trim(),
+        locationId: currentLocationId,
+      });
+      setNewRoomDialogOpen(false);
+      setNewRoomName("");
+      handleRoomSelect(room.id);
+    } finally {
+      setNewRoomSaving(false);
+    }
+  };
+
+  const handleCreateContainer = async () => {
+    if (!newContainerName.trim() || !selectedRoomId) return;
+    setNewContainerSaving(true);
+    try {
+      const container = await containersRepo.create({
+        name: newContainerName.trim(),
+        roomId: selectedRoomId,
+      });
+      setNewContainerDialogOpen(false);
+      setNewContainerName("");
+      handleContainerSelect(container.id);
+    } finally {
+      setNewContainerSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-lg px-4 py-6">
@@ -207,14 +248,19 @@ export default function NewItemPage() {
 
         {step === "room" && (
           <div className="space-y-2">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setNewRoomDialogOpen(true)}
+            >
+              <Plus className="size-4" />
+              新增房间
+            </Button>
             {rooms.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
                 <Home className="mb-3 size-10 text-muted-foreground" />
                 <p className="mb-1 text-sm font-medium">暂无房间</p>
-                <p className="mb-4 text-xs text-muted-foreground">请先创建房间</p>
-                <Link href="/rooms">
-                  <Button size="sm">前往创建</Button>
-                </Link>
+                <p className="text-xs text-muted-foreground">点击上方按钮创建房间</p>
               </div>
             ) : (
               rooms.map((room) => (
@@ -243,14 +289,19 @@ export default function NewItemPage() {
 
         {step === "container" && (
           <div className="space-y-2">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setNewContainerDialogOpen(true)}
+            >
+              <Plus className="size-4" />
+              新增容器
+            </Button>
             {containers.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
                 <Box className="mb-3 size-10 text-muted-foreground" />
                 <p className="mb-1 text-sm font-medium">该房间暂无容器</p>
-                <p className="mb-4 text-xs text-muted-foreground">请先在此房间创建容器</p>
-                <Link href={`/rooms/${selectedRoomId}`}>
-                  <Button size="sm">前往创建</Button>
-                </Link>
+                <p className="text-xs text-muted-foreground">点击上方按钮创建容器</p>
               </div>
             ) : (
               containers.map((container) => (
@@ -435,6 +486,54 @@ export default function NewItemPage() {
           </div>
         )}
       </main>
+
+      <Dialog open={newRoomDialogOpen} onOpenChange={setNewRoomDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新增房间</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Input
+              placeholder="房间名称"
+              value={newRoomName}
+              onChange={(e) => setNewRoomName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewRoomDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleCreateRoom} disabled={!newRoomName.trim() || newRoomSaving}>
+              {newRoomSaving ? "创建中..." : "创建"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={newContainerDialogOpen} onOpenChange={setNewContainerDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新增容器</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Input
+              placeholder="容器名称"
+              value={newContainerName}
+              onChange={(e) => setNewContainerName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewContainerDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleCreateContainer} disabled={!newContainerName.trim() || newContainerSaving}>
+              {newContainerSaving ? "创建中..." : "创建"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

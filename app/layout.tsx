@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { DBInitializer } from "@/components/db-initializer";
 import { LocationProvider } from "@/components/location-provider";
+import { ThemeProvider } from "@/lib/themes/theme-provider";
 import { AutoBackup } from "@/components/auto-backup";
 import "./globals.css";
 
@@ -48,11 +49,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <LocationProvider>
-          <DBInitializer />
-          <AutoBackup />
-          {children}
-        </LocationProvider>
+        <ThemeProvider>
+          <LocationProvider>
+            <DBInitializer />
+            <AutoBackup />
+            {children}
+          </LocationProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -13,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronLeft, Download, Upload, AlertTriangle, CheckCircle2, Home, Box, Package, Clock, Trash2, HardDrive, RefreshCw, FolderOpen, BookOpen, Tag } from "lucide-react";
+import { ChevronLeft, Download, Upload, AlertTriangle, CheckCircle2, Home, Box, Package, Clock, Trash2, HardDrive, RefreshCw, FolderOpen, BookOpen, Tag, Palette } from "lucide-react";
+import { ThemeSelector } from "@/components/theme-selector";
 import {
   getBackupSettings,
   enableAutoBackup,
@@ -383,6 +384,16 @@ export default function SettingsPage() {
               <p className="text-2xl font-bold">{stats.itemCount}</p>
               <p className="text-xs text-muted-foreground">物品</p>
             </div>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+            <Palette className="inline-block size-4 mr-1.5 -mt-0.5" />
+            外观主题
+          </h2>
+          <div className="rounded-lg border p-4">
+            <ThemeSelector />
           </div>
         </section>
 

@@ -11,6 +11,8 @@
 
 - **多地点管理**：支持管理多套房产，每个地点独立管理房间和物品
 - **层级管理**：地点 → 房间 → 容器 → 物品，清晰的四级结构
+- **流畅添加**：添加物品时可直接创建房间/容器，无需跳转
+- **主题切换**：三套现代化主题（海洋蓝、日落橙、森林绿），自由切换
 - **标签管理**：50+ 预设标签分类，支持自定义标签，智能标签建议
 - **拍照添加**：使用相机拍摄物品照片，快速添加物品
 - **图片管理**：为物品添加照片，直观识别
@@ -277,14 +279,21 @@ SpotIt/
 │   └── settings/          # 设置页面
 ├── components/            # 组件
 │   ├── ui/               # UI 组件
+│   ├── theme-selector.tsx # 主题选择器
 │   └── location-provider.tsx  # 地点状态管理
 ├── lib/                   # 工具库
 │   ├── db/               # 数据库层
 │   │   ├── index.ts     # Dexie 配置
 │   │   ├── hooks.ts     # React Hooks
 │   │   └── types.ts     # 类型定义
+│   ├── themes/           # 主题系统
+│   │   ├── types.ts     # 主题类型定义
+│   │   ├── config.ts    # 主题配置
+│   │   ├── theme-provider.tsx # 主题 Provider
+│   │   └── index.ts     # 统一导出
 │   └── utils/            # 工具函数
-│       └── image.ts      # 图片处理
+│       ├── image.ts      # 图片处理
+│       └── backup.ts     # 备份功能
 └── public/               # 静态资源
     ├── manifest.json     # PWA 清单
     └── icons/            # 应用图标
