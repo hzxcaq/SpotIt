@@ -12,6 +12,7 @@ import { processImage } from "@/lib/utils/image";
 import { getSuggestedTags } from "@/lib/utils/tag-suggestions";
 import { useLocationContext } from "@/components/location-provider";
 import { ChevronLeft, ChevronRight, Home, Box, Tag, Camera, Upload, Loader2, X, Plus } from "lucide-react";
+import { nanoid } from "nanoid";
 
 const unitOptions: ItemUnit[] = ["个", "件", "只", "盒", "箱", "包", "袋", "卷", "张", "本", "瓶", "罐", "桶", "套", "组", "对", "米", "厘米", "克", "千克"];
 
@@ -207,6 +208,7 @@ export default function NewItemPage() {
       const container = await containersRepo.create({
         name: newContainerName.trim(),
         roomId: selectedRoomId,
+        code: nanoid(8),
       });
       setNewContainerDialogOpen(false);
       setNewContainerName("");
