@@ -3,7 +3,7 @@ import withPWAInit from "next-pwa";
 
 const withPWA = withPWAInit({
   dest: "public",
-  disable: process.env.NODE_ENV === "development",
+  disable: true,
   register: true,
   skipWaiting: true,
   runtimeCaching: [
@@ -22,7 +22,7 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  // Turbopack disabled due to Windows compatibility issues
+  turbopack: {},
 };
 
 export default withPWA(nextConfig);
