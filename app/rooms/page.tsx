@@ -6,6 +6,7 @@ import { useRoomsByLocation, useLocations, roomsRepo } from "@/lib/db/hooks";
 import type { Room } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,9 @@ export default function RoomsPage() {
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
+  const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
 
   const currentLocation = locations.find(l => l.id === currentLocationId);
 
@@ -99,6 +103,43 @@ export default function RoomsPage() {
     }
   };
 
+  const toggleBatchMode = () => {
+    setBatchMode(!batchMode);
+    setSelectedRooms(new Set());
+  };
+
+  const toggleRoomSelection = (roomId: string) => {
+    const newSelected = new Set(selectedRooms);
+    if (newSelected.has(roomId)) {
+      newSelected.delete(roomId);
+    } else {
+      newSelected.add(roomId);
+    }
+    setSelectedRooms(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedRooms.size === rooms.length) {
+      setSelectedRooms(new Set());
+    } else {
+      setSelectedRooms(new Set(rooms.map(r => r.id)));
+    }
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedRooms.size > 0) {
+      setBatchDeleteConfirmOpen(true);
+    }
+  };
+
+  const confirmBatchDelete = async () => {
+    for (const roomId of selectedRooms) {
+      await roomsRepo.delete(roomId);
+    }
+    setSelectedRooms(new Set());
+    setBatchMode(false);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-lg px-4 py-6">
@@ -131,60 +172,92 @@ export default function RoomsPage() {
           </Link>
         </header>
 
-        <div className="mb-4 flex justify-end">
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" onClick={openCreateDialog}>
-                <Plus className="size-4" />
-                新增房间
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingRoom ? "编辑房间" : "新增房间"}</DialogTitle>
-                <DialogDescription>
-                  {editingRoom ? "修改房间信息" : "添加一个新的房间来组织您的物品"}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label htmlFor="room-name" className="text-sm font-medium">
-                    房间名称
-                  </label>
-                  <Input
-                    id="room-name"
-                    placeholder="例如：客厅、卧室、书房"
-                    value={roomName}
-                    onChange={(e) => setRoomName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="room-description" className="text-sm font-medium">
-                    描述（可选）
-                  </label>
-                  <Input
-                    id="room-description"
-                    placeholder="房间的简要描述"
-                    value={roomDescription}
-                    onChange={(e) => setRoomDescription(e.target.value)}
-                  />
-                </div>
+        <div className="mb-4 flex justify-between items-center">
+          {batchMode ? (
+            <>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+                  {selectedRooms.size === rooms.length ? "取消全选" : "全选"}
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  已选 {selectedRooms.size} 项
+                </span>
               </div>
-              {error && (
-                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBatchDelete}
+                  disabled={selectedRooms.size === 0}
+                >
+                  <Trash2 className="size-4" />
+                  删除
+                </Button>
+                <Button variant="outline" size="sm" onClick={toggleBatchMode}>
                   取消
                 </Button>
-                <Button onClick={handleSubmit} disabled={!roomName.trim() || saving}>
-                  {saving ? "保存中..." : editingRoom ? "保存" : "创建"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </div>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={toggleBatchMode}>
+                批量管理
+              </Button>
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" onClick={openCreateDialog}>
+                    <Plus className="size-4" />
+                    新增房间
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{editingRoom ? "编辑房间" : "新增房间"}</DialogTitle>
+                    <DialogDescription>
+                      {editingRoom ? "修改房间信息" : "添加一个新的房间来组织您的物品"}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <label htmlFor="room-name" className="text-sm font-medium">
+                        房间名称
+                      </label>
+                      <Input
+                        id="room-name"
+                        placeholder="例如：客厅、卧室、书房"
+                        value={roomName}
+                        onChange={(e) => setRoomName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="room-description" className="text-sm font-medium">
+                        描述（可选）
+                      </label>
+                      <Input
+                        id="room-description"
+                        placeholder="房间的简要描述"
+                        value={roomDescription}
+                        onChange={(e) => setRoomDescription(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  {error && (
+                    <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                      {error}
+                    </div>
+                  )}
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+                      取消
+                    </Button>
+                    <Button onClick={handleSubmit} disabled={!roomName.trim() || saving}>
+                      {saving ? "保存中..." : editingRoom ? "保存" : "创建"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
         </div>
 
         {rooms.length === 0 ? (
@@ -200,9 +273,23 @@ export default function RoomsPage() {
                 key={room.id}
                 className="relative flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
               >
+                {batchMode && (
+                  <div className="flex items-center mr-3">
+                    <Checkbox
+                      checked={selectedRooms.has(room.id)}
+                      onCheckedChange={() => toggleRoomSelection(room.id)}
+                    />
+                  </div>
+                )}
                 <Link
                   href={`/rooms/${room.id}`}
                   className="flex flex-1 items-center gap-3"
+                  onClick={(e) => {
+                    if (batchMode) {
+                      e.preventDefault();
+                      toggleRoomSelection(room.id);
+                    }
+                  }}
                 >
                   <div className="flex size-10 items-center justify-center rounded-full bg-muted">
                     <Home className="size-5" />
@@ -214,47 +301,49 @@ export default function RoomsPage() {
                     )}
                   </div>
                 </Link>
-                <div className="flex items-center gap-1">
-                  <div className="relative">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setMenuOpenId(menuOpenId === room.id ? null : room.id);
-                      }}
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </Button>
-                    {menuOpenId === room.id && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setMenuOpenId(null)}
-                        />
-                        <div className="absolute right-0 top-full z-20 mt-1 w-32 rounded-md border bg-background py-1 shadow-lg">
-                          <button
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
-                            onClick={() => openEditDialog(room)}
-                          >
-                            <Edit className="size-4" />
-                            编辑
-                          </button>
-                          <button
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-muted"
-                            onClick={() => handleDelete(room.id)}
-                          >
-                            <Trash2 className="size-4" />
-                            删除
-                          </button>
-                        </div>
-                      </>
-                    )}
+                {!batchMode && (
+                  <div className="flex items-center gap-1">
+                    <div className="relative">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setMenuOpenId(menuOpenId === room.id ? null : room.id);
+                        }}
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                      {menuOpenId === room.id && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setMenuOpenId(null)}
+                          />
+                          <div className="absolute right-0 top-full z-20 mt-1 w-32 rounded-md border bg-background py-1 shadow-lg">
+                            <button
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
+                              onClick={() => openEditDialog(room)}
+                            >
+                              <Edit className="size-4" />
+                              编辑
+                            </button>
+                            <button
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-muted"
+                              onClick={() => handleDelete(room.id)}
+                            >
+                              <Trash2 className="size-4" />
+                              删除
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <Link href={`/rooms/${room.id}`}>
+                      <ChevronRight className="size-5 text-muted-foreground" />
+                    </Link>
                   </div>
-                  <Link href={`/rooms/${room.id}`}>
-                    <ChevronRight className="size-5 text-muted-foreground" />
-                  </Link>
-                </div>
+                )}
               </div>
             ))}
           </div>
@@ -266,6 +355,16 @@ export default function RoomsPage() {
           onConfirm={confirmDelete}
           title="删除房间"
           description="确定要删除此房间吗？房间内的容器也会被删除，物品将变为未分类状态。"
+          confirmText="删除"
+          cancelText="取消"
+        />
+
+        <ConfirmDialog
+          open={batchDeleteConfirmOpen}
+          onOpenChange={setBatchDeleteConfirmOpen}
+          onConfirm={confirmBatchDelete}
+          title="批量删除房间"
+          description={`确定要删除选中的 ${selectedRooms.size} 个房间吗？房间内的容器也会被删除，物品将变为未分类状态。`}
           confirmText="删除"
           cancelText="取消"
         />
