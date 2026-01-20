@@ -93,6 +93,13 @@ export interface ItemHistory extends BaseEntity {
   note?: string;
 }
 
+export interface TagCategory extends BaseEntity {
+  name: string;
+  keywords: string[];
+  suggestions: string[];
+  isCustom: boolean;
+}
+
 // ============ Input Types (for creation) ============
 
 export type CreateLocationInput = Omit<Location, "id" | "createdAt" | "updatedAt">;
@@ -108,3 +115,6 @@ export type CreateItemInput = Omit<Item, "id" | "createdAt" | "updatedAt">;
 export type UpdateItemInput = Partial<CreateItemInput>;
 
 export type CreateImageInput = Omit<Image, "id" | "createdAt" | "updatedAt">;
+
+export type CreateTagCategoryInput = Omit<TagCategory, "id" | "createdAt" | "updatedAt">;
+export type UpdateTagCategoryInput = Partial<CreateTagCategoryInput>;

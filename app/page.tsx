@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAllHistory, useItems, useContainers, useLocations } from "@/lib/db/hooks";
+import { useAllHistory, useItems, useContainers, useLocations, useRoomsByLocation } from "@/lib/db/hooks";
 import type { HistoryAction } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,9 +47,19 @@ export default function HomePage() {
   const containers = useContainers();
   const { currentLocationId, setCurrentLocationId } = useLocationContext();
   const locations = useLocations();
+  const currentLocationRooms = useRoomsByLocation(currentLocationId);
 
   const currentLocation = locations.find(l => l.id === currentLocationId);
-  const recentHistory = history.slice(0, 4);
+
+  const filteredHistory = useMemo(() => {
+    const roomIds = new Set(currentLocationRooms.map(r => r.id));
+    return history.filter(record => {
+      const item = items.find(i => i.id === record.itemId);
+      return item && item.roomId && roomIds.has(item.roomId);
+    });
+  }, [history, items, currentLocationRooms]);
+
+  const recentHistory = filteredHistory.slice(0, 4);
 
   const getItemName = (itemId: string) => {
     return items.find((i) => i.id === itemId)?.name || "已删除物品";

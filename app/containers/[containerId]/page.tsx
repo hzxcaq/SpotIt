@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useRef } from "react";
+import { use, useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useContainer, useRoom, useItemsByContainer, itemsRepo, imagesRepo, useItemImage } from "@/lib/db/hooks";
 import type { Item, ItemUnit } from "@/lib/db/types";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { processImage } from "@/lib/utils/image";
+import { getSuggestedTags } from "@/lib/utils/tag-suggestions";
 import { Plus, ChevronRight, ChevronLeft, Package, Box, Tag, MoreHorizontal, Edit, Trash2, Image as ImageIcon, Camera, Upload, Loader2, X } from "lucide-react";
 
 interface ContainerDetailPageProps {
@@ -53,6 +54,7 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
   const [itemUnit, setItemUnit] = useState<ItemUnit>("个");
   const [itemTags, setItemTags] = useState("");
   const [itemNotes, setItemNotes] = useState("");
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
@@ -88,6 +90,22 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
     setUploadError(null);
     setDialogOpen(true);
     setMenuOpenId(null);
+  };
+
+  useEffect(() => {
+    getSuggestedTags(itemName).then(setSuggestedTags);
+  }, [itemName]);
+
+  const handleAddTag = (tag: string) => {
+    const currentTags = itemTags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    if (!currentTags.includes(tag)) {
+      const newTags = [...currentTags, tag].join(", ");
+      setItemTags(newTags);
+    }
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -356,6 +374,23 @@ export default function ContainerDetailPage({ params }: ContainerDetailPageProps
                     value={itemTags}
                     onChange={(e) => setItemTags(e.target.value)}
                   />
+                  {suggestedTags.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-muted-foreground">建议标签（点击添加）：</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {suggestedTags.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => handleAddTag(tag)}
+                            className="rounded-full bg-muted px-2.5 py-1 text-xs hover:bg-muted/80 active:bg-muted/60 transition-colors"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="item-notes" className="text-sm font-medium">

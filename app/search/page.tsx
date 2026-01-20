@@ -3,11 +3,11 @@
 import { useState, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useItems, useContainers, useRooms } from "@/lib/db/hooks";
+import { useItems, useContainers, useRooms, useLocations } from "@/lib/db/hooks";
 import type { Item } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, Search, Tag, Box, Home, ChevronRight } from "lucide-react";
+import { ChevronLeft, Search, Tag, Box, Home, ChevronRight, MapPin } from "lucide-react";
 
 const statusLabels: Record<Item["status"], string> = {
   in_stock: "在库",
@@ -33,6 +33,7 @@ function SearchContent() {
   const items = useItems();
   const containers = useContainers();
   const rooms = useRooms();
+  const locations = useLocations();
 
   const containerMap = useMemo(() => {
     const map = new Map<string, { name: string; roomId: string }>();
@@ -41,10 +42,16 @@ function SearchContent() {
   }, [containers]);
 
   const roomMap = useMemo(() => {
-    const map = new Map<string, string>();
-    rooms.forEach((r) => map.set(r.id, r.name));
+    const map = new Map<string, { name: string; locationId?: string }>();
+    rooms.forEach((r) => map.set(r.id, { name: r.name, locationId: r.locationId }));
     return map;
   }, [rooms]);
+
+  const locationMap = useMemo(() => {
+    const map = new Map<string, string>();
+    locations.forEach((l) => map.set(l.id, l.name));
+    return map;
+  }, [locations]);
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -62,9 +69,12 @@ function SearchContent() {
   const getLocation = (item: Item) => {
     const container = item.containerId ? containerMap.get(item.containerId) : null;
     const roomId = container?.roomId ?? item.roomId;
-    const roomName = roomId ? roomMap.get(roomId) : null;
+    const room = roomId ? roomMap.get(roomId) : null;
+    const locationId = room?.locationId;
+    const locationName = locationId ? locationMap.get(locationId) : null;
     return {
-      roomName,
+      locationName,
+      roomName: room?.name,
       containerName: container?.name,
     };
   };
@@ -141,10 +151,16 @@ function SearchContent() {
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {item.quantity} {item.unit}
-                          {(location.roomName || location.containerName) && (
+                          {(location.locationName || location.roomName || location.containerName) && (
                             <span className="ml-2">
-                              {location.roomName && (
+                              {location.locationName && (
                                 <span className="inline-flex items-center gap-0.5">
+                                  <MapPin className="size-3" />
+                                  {location.locationName}
+                                </span>
+                              )}
+                              {location.roomName && (
+                                <span className="inline-flex items-center gap-0.5 ml-1">
                                   <Home className="size-3" />
                                   {location.roomName}
                                 </span>

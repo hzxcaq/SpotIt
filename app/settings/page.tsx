@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronLeft, Download, Upload, AlertTriangle, CheckCircle2, Home, Box, Package, Clock, Trash2, HardDrive, RefreshCw, FolderOpen, BookOpen } from "lucide-react";
+import { ChevronLeft, Download, Upload, AlertTriangle, CheckCircle2, Home, Box, Package, Clock, Trash2, HardDrive, RefreshCw, FolderOpen, BookOpen, Tag } from "lucide-react";
 import {
   getBackupSettings,
   enableAutoBackup,
@@ -603,6 +603,19 @@ export default function SettingsPage() {
         <section>
           <h2 className="mb-3 text-sm font-medium text-muted-foreground">关于</h2>
           <div className="space-y-3">
+            <Link href="/settings/tags">
+              <div className="rounded-lg border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <Tag className="size-5 text-primary" />
+                  <div className="flex-1">
+                    <p className="font-medium">标签管理</p>
+                    <p className="text-xs text-muted-foreground">管理标签分类和查看使用统计</p>
+                  </div>
+                  <ChevronLeft className="size-5 rotate-180 text-muted-foreground" />
+                </div>
+              </div>
+            </Link>
+
             <Link href="/help">
               <div className="rounded-lg border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
                 <div className="flex items-center gap-3">

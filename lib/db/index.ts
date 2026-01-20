@@ -7,15 +7,18 @@ import type {
   Item,
   Image,
   ItemHistory,
+  TagCategory,
   CreateLocationInput,
   CreateRoomInput,
   CreateContainerInput,
   CreateItemInput,
   CreateImageInput,
+  CreateTagCategoryInput,
   UpdateLocationInput,
   UpdateRoomInput,
   UpdateContainerInput,
   UpdateItemInput,
+  UpdateTagCategoryInput,
   ID,
 } from "./types";
 
@@ -28,6 +31,7 @@ class SpotItDB extends Dexie {
   items!: EntityTable<Item, "id">;
   images!: EntityTable<Image, "id">;
   history!: EntityTable<ItemHistory, "id">;
+  tagCategories!: EntityTable<TagCategory, "id">;
 
   constructor() {
     super("SpotItDB");
@@ -43,6 +47,10 @@ class SpotItDB extends Dexie {
     this.version(2).stores({
       locations: "&id, name, isDefault, createdAt",
       rooms: "&id, locationId, name, createdAt",
+    });
+
+    this.version(3).stores({
+      tagCategories: "&id, name, isCustom, createdAt",
     });
   }
 }
@@ -384,6 +392,37 @@ export const historyRepo = {
   },
 };
 
+// ============ TagCategory Operations ============
+
+export const tagCategoriesRepo = {
+  async create(input: CreateTagCategoryInput): Promise<TagCategory> {
+    const tagCategory: TagCategory = {
+      id: generateId(),
+      ...input,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    await db.tagCategories.add(tagCategory);
+    return tagCategory;
+  },
+
+  async getById(id: ID): Promise<TagCategory | undefined> {
+    return db.tagCategories.get(id);
+  },
+
+  async getAll(): Promise<TagCategory[]> {
+    return db.tagCategories.orderBy("createdAt").toArray();
+  },
+
+  async update(id: ID, input: UpdateTagCategoryInput): Promise<void> {
+    await db.tagCategories.update(id, { ...input, updatedAt: now() });
+  },
+
+  async delete(id: ID): Promise<void> {
+    await db.tagCategories.delete(id);
+  },
+};
+
 // ============ Database Initialization ============
 
 export const initializeDefaultTemplate = async (): Promise<void> => {
@@ -419,5 +458,18 @@ export const initializeDefaultTemplate = async (): Promise<void> => {
   const existingRooms = await db.rooms.count();
   if (existingRooms > 0 && defaultLocationId) {
     await db.rooms.filter(r => !r.locationId).modify({ locationId: defaultLocationId });
+  }
+
+  const existingTagCategories = await db.tagCategories.count();
+  if (existingTagCategories === 0) {
+    const { tagCategories } = await import("@/lib/utils/tag-suggestions");
+    for (const [name, category] of Object.entries(tagCategories)) {
+      await tagCategoriesRepo.create({
+        name,
+        keywords: category.keywords,
+        suggestions: category.suggestions,
+        isCustom: false,
+      });
+    }
   }
 };

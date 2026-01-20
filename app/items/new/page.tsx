@@ -3,11 +3,13 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRooms, useContainersByRoom, itemsRepo, imagesRepo } from "@/lib/db/hooks";
+import { useRoomsByLocation, useContainersByRoom, itemsRepo, imagesRepo } from "@/lib/db/hooks";
 import type { ItemUnit } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { processImage } from "@/lib/utils/image";
+import { getSuggestedTags } from "@/lib/utils/tag-suggestions";
+import { useLocationContext } from "@/components/location-provider";
 import { ChevronLeft, ChevronRight, Home, Box, Tag, Camera, Upload, Loader2, X } from "lucide-react";
 
 const unitOptions: ItemUnit[] = ["个", "件", "只", "盒", "箱", "包", "袋", "卷", "张", "本", "瓶", "罐", "桶", "套", "组", "对", "米", "厘米", "克", "千克"];
@@ -16,7 +18,8 @@ type Step = "room" | "container" | "item";
 
 export default function NewItemPage() {
   const router = useRouter();
-  const rooms = useRooms();
+  const { currentLocationId } = useLocationContext();
+  const rooms = useRoomsByLocation(currentLocationId);
   const [step, setStep] = useState<Step>("room");
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
@@ -28,6 +31,7 @@ export default function NewItemPage() {
   const [itemTags, setItemTags] = useState("");
   const [itemNotes, setItemNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -37,6 +41,13 @@ export default function NewItemPage() {
 
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId);
   const selectedContainer = containers.find((c) => c.id === selectedContainerId);
+
+  useEffect(() => {
+    if (step === "room") {
+      console.log("Current locationId:", currentLocationId);
+      console.log("Rooms:", rooms);
+    }
+  }, [step, currentLocationId, rooms]);
 
   useEffect(() => {
     const capturedPhoto = sessionStorage.getItem("capturedPhoto");
@@ -53,6 +64,22 @@ export default function NewItemPage() {
         .catch(console.error);
     }
   }, []);
+
+  useEffect(() => {
+    getSuggestedTags(itemName).then(setSuggestedTags);
+  }, [itemName]);
+
+  const handleAddTag = (tag: string) => {
+    const currentTags = itemTags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    if (!currentTags.includes(tag)) {
+      const newTags = [...currentTags, tag].join(", ");
+      setItemTags(newTags);
+    }
+  };
 
   const handleRoomSelect = (roomId: string) => {
     setSelectedRoomId(roomId);
@@ -367,6 +394,23 @@ export default function NewItemPage() {
                 value={itemTags}
                 onChange={(e) => setItemTags(e.target.value)}
               />
+              {suggestedTags.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground">建议标签（点击添加）：</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestedTags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => handleAddTag(tag)}
+                        className="rounded-full bg-muted px-2.5 py-1 text-xs hover:bg-muted/80 active:bg-muted/60 transition-colors"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
