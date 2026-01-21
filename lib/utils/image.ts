@@ -55,13 +55,37 @@ export function readFileAsDataURL(file: File): Promise<string> {
 }
 
 /**
- * Load image from data URL
+ * Load image from data URL with timeout and cleanup
  */
-export function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+export function loadImage(dataUrl: string, timeout = 30000): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("图片加载失败"));
+    let timeoutId: NodeJS.Timeout;
+
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      img.onload = null;
+      img.onerror = null;
+    };
+
+    img.onload = () => {
+      cleanup();
+      resolve(img);
+    };
+
+    img.onerror = () => {
+      cleanup();
+      reject(new Error("图片加载失败"));
+    };
+
+    // 设置超时
+    timeoutId = setTimeout(() => {
+      cleanup();
+      reject(new Error("图片加载超时"));
+    }, timeout);
+
     img.src = dataUrl;
   });
 }
@@ -112,14 +136,25 @@ function compressToCanvas(
     throw new Error("无法创建 Canvas 上下文");
   }
 
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fillRect(0, 0, targetWidth, targetHeight);
-  ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+  try {
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-  const dataUrl = canvas.toDataURL(format, quality);
-  const size = Math.round((dataUrl.length * 3) / 4);
+    const dataUrl = canvas.toDataURL(format, quality);
+    const size = Math.round((dataUrl.length * 3) / 4);
 
-  return { dataUrl, size };
+    return { dataUrl, size };
+  } finally {
+    // 清理 Canvas 资源，防止内存泄漏
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+    canvas.width = 0;
+    canvas.height = 0;
+    // 从 DOM 中移除（如果已添加）
+    if (canvas.parentNode) {
+      canvas.parentNode.removeChild(canvas);
+    }
+  }
 }
 
 /**

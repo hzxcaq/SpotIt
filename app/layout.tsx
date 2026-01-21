@@ -4,6 +4,7 @@ import { DBInitializer } from "@/components/db-initializer";
 import { LocationProvider } from "@/components/location-provider";
 import { ThemeProvider } from "@/lib/themes/theme-provider";
 import { AutoBackup } from "@/components/auto-backup";
+import { ErrorBoundary } from "@/components/error-boundary";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -49,13 +50,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider>
-          <LocationProvider>
-            <DBInitializer />
-            <AutoBackup />
-            {children}
-          </LocationProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <LocationProvider>
+              <DBInitializer />
+              <AutoBackup />
+              {children}
+            </LocationProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
